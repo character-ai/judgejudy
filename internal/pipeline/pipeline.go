@@ -145,10 +145,19 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	// Merge generator params with test case metadata (metadata overrides)
+	params := make(map[string]any)
+	for k, v := range p.cfg.Generator.Params {
+		params[k] = v
+	}
+	for k, v := range tc.Metadata {
+		params[k] = v
+	}
+
 	req := models.GenerateRequest{
 		Prompt:   tc.Input,
 		Modality: modality,
-		Params:   p.cfg.Generator.Params,
+		Params:   params,
 	}
 
 	// Check cache

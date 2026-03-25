@@ -1,0 +1,111 @@
+name: "Image Edit Quality Eval"
+description: "Evaluate image-to-image editing quality using NanoBanana (Gemini) and SD4 Edit via WaveSpeed"
+
+dataset:
+  inline:
+    id: "image-edit-v1"
+    name: "Image Edit Test Cases"
+    version: "1.0.0"
+    modality: image
+    test_cases:
+      - id: "edit-style-oil"
+        input: "Transform this photo into an oil painting style while preserving the composition and subjects"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1024"]
+        tags: ["style-transfer", "oil-painting"]
+
+      - id: "edit-season-winter"
+        input: "Change the season to winter — add snow on the ground, bare trees, and a cold atmosphere"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1024"]
+        tags: ["season-change", "winter"]
+
+      - id: "edit-time-night"
+        input: "Change the time of day to night — dark sky with stars, warm window lights, street lamps on"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=1024"]
+        tags: ["time-change", "night"]
+
+      - id: "edit-remove-bg"
+        input: "Replace the background with a clean white studio background, keep the subject exactly as is"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1529778873920-4da4926a72c2?w=1024"]
+        tags: ["background-removal", "studio"]
+
+      - id: "edit-add-object"
+        input: "Add a hot air balloon floating in the sky above the landscape"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1024"]
+        tags: ["object-addition", "compositing"]
+
+      - id: "edit-color-bw"
+        input: "Convert to black and white but keep the red elements in color (selective color)"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=1024"]
+        tags: ["color-grading", "selective-color"]
+
+      - id: "edit-enhance-detail"
+        input: "Enhance the details and make the textures more vivid and sharp, as if shot with a professional camera"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1024"]
+        tags: ["enhancement", "detail"]
+
+      - id: "edit-weather-rain"
+        input: "Add rain to the scene — wet reflections on surfaces, rain droplets, overcast sky, puddles on the ground"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1024"]
+        tags: ["weather", "rain"]
+
+      - id: "edit-age-vintage"
+        input: "Make this photo look like it was taken in the 1970s — warm film grain, faded colors, slight vignette"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1517456793572-1d8efd6dc135?w=1024"]
+        tags: ["vintage", "film-look"]
+
+      - id: "edit-cartoon"
+        input: "Transform this into a Studio Ghibli anime style illustration while keeping the same scene and composition"
+        metadata:
+          images: ["https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1024"]
+        tags: ["style-transfer", "anime"]
+
+generator:
+  provider: wavespeed
+  model: /v3/google/gemini-2.5-flash-image/edit
+  params:
+    model_path: "/v3/google/gemini-2.5-flash-image/edit"
+
+evaluators:
+  - name: "edit-quality-judge"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      You are evaluating an AI image edit. You will see the edited output image.
+      The original image was a stock photo, and the edit instruction is shown above.
+
+      Evaluate the edit on these criteria:
+      - Instruction following: Does the edit match what was requested? Score 1 if the edit is completely wrong or unrelated. Score 5 if it perfectly follows the instruction.
+      - Preservation: Are the parts that should NOT change preserved correctly? Score 1 if the image is completely different. Score 5 if unedited areas are perfectly preserved.
+      - Quality: Is the edited image high quality without artifacts, blurring, distortion, or obvious AI tells? Score 1 if heavily distorted. Score 5 if indistinguishable from a professional edit.
+      - Coherence: Does the edit blend naturally with the rest of the image? Score 1 if the edit looks pasted on. Score 5 if seamlessly integrated.
+      - Creativity: For style transfers and artistic edits, is the result aesthetically pleasing? Score 1 if ugly or generic. Score 5 if impressive and tasteful.
+    dimensions:
+      - instruction_following
+      - preservation
+      - quality
+      - coherence
+      - creativity
+    scale: [1, 5]
+
+  - name: "clip-score"
+    type: metric
+    metric: clip_score
+
+pipeline:
+  concurrency: 2
+  timeout_seconds: 120
+
+report:
+  output_path: "./image_edit_report.html"
+  title: "Image Edit Quality Report"

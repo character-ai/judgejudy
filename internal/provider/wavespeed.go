@@ -45,13 +45,17 @@ func (p *WaveSpeedProvider) Generate(ctx context.Context, req *models.GenerateRe
 	headers := map[string]string{"Authorization": "Bearer " + p.apiKey}
 
 	payload := map[string]any{"prompt": req.Prompt}
-	for _, key := range []string{"image", "last_image", "resolution", "negative_prompt", "seed"} {
+	for _, key := range []string{"image", "last_image", "resolution", "negative_prompt", "seed", "size", "guidance_scale"} {
 		if v := getParam(req.Params, key, ""); v != "" {
 			payload[key] = v
 		}
 	}
 	if dur := getParamInt(req.Params, "duration", 0); dur > 0 {
 		payload["duration"] = dur
+	}
+	// Support images array for editing models (SD4 Edit, NanoBanana Edit, etc.)
+	if images := req.Params["images"]; images != nil {
+		payload["images"] = images
 	}
 
 	// Step 1: Submit
