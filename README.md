@@ -174,6 +174,32 @@ report:
   output_path: "./report.html"
 ```
 
+### Dataset Sources
+
+The `dataset.path` field supports local files and GCS:
+
+```yaml
+# Local file (YAML or JSON)
+dataset:
+  path: "./my_dataset.yaml"
+
+# GCS file — parsed as a standard dataset
+dataset:
+  path: "gs://my-bucket/evals/text_dataset.yaml"
+
+# GCS directory — each file becomes a test case
+# Filename (minus extension) = test case ID
+# File content = test case input
+dataset:
+  path: "gs://my-bucket/evals/prompts/"
+```
+
+When pointing to a GCS directory, each file is processed as follows:
+- **YAML/JSON files** with `input`/`id` fields are parsed as structured test cases
+- **All other files** use the raw content as the input and the filename as the test case ID
+
+GCS auth uses standard Google Application Default Credentials (`gcloud auth application-default login` or `GOOGLE_APPLICATION_CREDENTIALS`).
+
 See `examples/` for complete configs covering text, image, audio, video, and multi-judge consensus.
 
 ## CLI Reference
