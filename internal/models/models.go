@@ -46,6 +46,7 @@ type GenerateResponse struct {
 	Content     string  `json:"content"`
 	ContentType string  `json:"content_type"`
 	FilePath    string  `json:"file_path,omitempty"`
+	MediaPath   string  `json:"media_path,omitempty"` // relative path to extracted media file (set by report generator)
 	LatencyMs   int64   `json:"latency_ms"`
 	CostUSD     float64 `json:"cost_usd"`
 	TokensUsed  int     `json:"tokens_used,omitempty"`

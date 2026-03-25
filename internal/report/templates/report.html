@@ -258,11 +258,11 @@ table.results tr.expanded-row td { background: #f9fafb; padding: 16px 24px; }
               <pre>{{$result.Input}}</pre>
               <h4>Generated Output</h4>
               {{if isMediaType $result.GeneratedOutput.ContentType "image"}}
-              <img src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}" alt="output image"/>
+              {{if $result.GeneratedOutput.MediaPath}}<img src="{{$result.GeneratedOutput.MediaPath}}" alt="output image"/>{{else}}<img src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}" alt="output image"/>{{end}}
               {{else if isMediaType $result.GeneratedOutput.ContentType "audio"}}
-              <audio controls src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}"></audio>
+              {{if $result.GeneratedOutput.MediaPath}}<audio controls src="{{$result.GeneratedOutput.MediaPath}}"></audio>{{else}}<audio controls src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}"></audio>{{end}}
               {{else if isMediaType $result.GeneratedOutput.ContentType "video"}}
-              <video controls src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}"></video>
+              {{if $result.GeneratedOutput.MediaPath}}<video controls src="{{$result.GeneratedOutput.MediaPath}}"></video>{{else}}<video controls src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}"></video>{{end}}
               {{else}}
               <pre>{{$result.GeneratedOutput.Content}}</pre>
               {{end}}

@@ -2,7 +2,9 @@
 .idea
 JUDGEJUDY-SPEC.md
 *_report.html
+*_report_media/
 report.html
+report_media/
 human_eval_*.json
 judgejudy
 build/

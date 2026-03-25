@@ -2,10 +2,12 @@ package report
 
 import (
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,8 +27,14 @@ type ReportData struct {
 }
 
 // GenerateReport builds an HTML report from a run and optional comparison,
-// writing the result to outputPath.
+// writing the result to outputPath. Media content is extracted to a sibling
+// directory (<report_name>_media/) to keep the HTML file small.
 func GenerateReport(run *models.Run, comparison *models.Comparison, outputPath string) error {
+	// Extract media to files before building report data
+	if run != nil {
+		extractMedia(run, outputPath)
+	}
+
 	data := buildReportData(run, comparison)
 
 	funcMap := template.FuncMap{
@@ -198,6 +206,67 @@ func allPassed(scores map[string]models.Score) bool {
 		}
 	}
 	return true
+}
+
+// extractMedia writes base64 media content from results to files in a sibling
+// directory, replacing Content with a relative file path (MediaPath).
+func extractMedia(run *models.Run, reportPath string) {
+	// Build media dir path: report.html -> report_media/
+	base := strings.TrimSuffix(reportPath, filepath.Ext(reportPath))
+	mediaDir := base + "_media"
+
+	created := false
+	for i := range run.Results {
+		r := &run.Results[i]
+		ct := r.GeneratedOutput.ContentType
+		if ct == "" || r.GeneratedOutput.Content == "" {
+			continue
+		}
+		if !strings.HasPrefix(ct, "audio") && !strings.HasPrefix(ct, "image") && !strings.HasPrefix(ct, "video") {
+			continue
+		}
+
+		if !created {
+			os.MkdirAll(mediaDir, 0755)
+			created = true
+		}
+
+		ext := extForMedia(ct)
+		filename := fmt.Sprintf("%s%s", r.TestCaseID, ext)
+		filePath := filepath.Join(mediaDir, filename)
+
+		data, err := base64.StdEncoding.DecodeString(r.GeneratedOutput.Content)
+		if err != nil {
+			continue
+		}
+		if err := os.WriteFile(filePath, data, 0644); err != nil {
+			continue
+		}
+
+		// Replace base64 content with relative path for the template
+		relDir := filepath.Base(mediaDir)
+		r.GeneratedOutput.MediaPath = relDir + "/" + filename
+		r.GeneratedOutput.Content = "" // free the memory
+	}
+}
+
+func extForMedia(ct string) string {
+	switch {
+	case strings.Contains(ct, "wav"):
+		return ".wav"
+	case strings.Contains(ct, "mp3"), strings.Contains(ct, "mpeg"):
+		return ".mp3"
+	case strings.Contains(ct, "mp4"):
+		return ".mp4"
+	case strings.Contains(ct, "png"):
+		return ".png"
+	case strings.Contains(ct, "jpeg"), strings.Contains(ct, "jpg"):
+		return ".jpg"
+	case strings.Contains(ct, "webp"):
+		return ".webp"
+	default:
+		return ".bin"
+	}
 }
 
 func isMediaType(contentType, prefix string) bool {
