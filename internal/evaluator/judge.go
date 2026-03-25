@@ -15,28 +15,41 @@ import (
 	"github.com/character-ai/judgejudy/internal/models"
 )
 
-// extractVideoFrames decodes a base64 video, extracts N evenly-spaced frames
-// using ffmpeg, and returns them as base64 PNG strings.
-func extractVideoFrames(b64Video string, numFrames int) []string {
-	videoData, err := base64.StdEncoding.DecodeString(b64Video)
-	if err != nil {
-		return nil
+// resolveVideoPath returns a file path to the video content.
+// If MediaPath is set (already on disk), returns that directly.
+// Otherwise decodes base64 to a temp file (caller should clean up).
+func resolveVideoPath(output models.GenerateResponse) string {
+	if output.MediaPath != "" {
+		return output.MediaPath
 	}
+	if output.Content == "" {
+		return ""
+	}
+	data, err := base64.StdEncoding.DecodeString(output.Content)
+	if err != nil {
+		return ""
+	}
+	f, err := os.CreateTemp("", "jj_video_*.mp4")
+	if err != nil {
+		return ""
+	}
+	f.Write(data)
+	f.Close()
+	return f.Name()
+}
 
+// extractVideoFramesFromFile extracts N evenly-spaced frames from a video file,
+// returning them as base64 PNG strings.
+func extractVideoFramesFromFile(videoPath string, numFrames int) []string {
 	tmpDir, err := os.MkdirTemp("", "jj_frames_*")
 	if err != nil {
 		return nil
 	}
 	defer os.RemoveAll(tmpDir)
 
-	videoPath := filepath.Join(tmpDir, "input.mp4")
-	if err := os.WriteFile(videoPath, videoData, 0644); err != nil {
-		return nil
-	}
-
-	// Use ffmpeg to extract N evenly spaced frames, scaled to 512px wide
 	outPattern := filepath.Join(tmpDir, "frame_%03d.png")
-	// Get video duration first
+
+	// Get video duration
 	probeCmd := exec.Command("ffprobe",
 		"-v", "error",
 		"-show_entries", "format=duration",
@@ -46,14 +59,12 @@ func extractVideoFrames(b64Video string, numFrames int) []string {
 	durationOut, _ := probeCmd.Output()
 	duration := strings.TrimSpace(string(durationOut))
 
-	// Calculate fps to get roughly numFrames total frames
 	fpsVal := "1"
 	if duration != "" {
 		var dur float64
 		fmt.Sscanf(duration, "%f", &dur)
 		if dur > 0 {
-			fps := float64(numFrames) / dur
-			fpsVal = fmt.Sprintf("%.4f", fps)
+			fpsVal = fmt.Sprintf("%.4f", float64(numFrames)/dur)
 		}
 	}
 
@@ -65,7 +76,6 @@ func extractVideoFrames(b64Video string, numFrames int) []string {
 	)
 	cmd.Run()
 
-	// Read extracted frames
 	var frames []string
 	for i := 1; i <= numFrames; i++ {
 		framePath := filepath.Join(tmpDir, fmt.Sprintf("frame_%03d.png", i))
@@ -78,25 +88,15 @@ func extractVideoFrames(b64Video string, numFrames int) []string {
 	return frames
 }
 
-// extractVideoAudio decodes a base64 video and extracts the audio track as WAV using ffmpeg.
-func extractVideoAudio(b64Video string) string {
-	videoData, err := base64.StdEncoding.DecodeString(b64Video)
-	if err != nil {
-		return ""
-	}
-
+// extractVideoAudioFromFile extracts the audio track from a video file as base64 WAV.
+func extractVideoAudioFromFile(videoPath string) string {
 	tmpDir, err := os.MkdirTemp("", "jj_audio_*")
 	if err != nil {
 		return ""
 	}
 	defer os.RemoveAll(tmpDir)
 
-	videoPath := filepath.Join(tmpDir, "input.mp4")
 	audioPath := filepath.Join(tmpDir, "audio.wav")
-	if err := os.WriteFile(videoPath, videoData, 0644); err != nil {
-		return ""
-	}
-
 	cmd := exec.Command("ffmpeg",
 		"-i", videoPath,
 		"-vn", "-acodec", "pcm_s16le",
@@ -104,7 +104,7 @@ func extractVideoAudio(b64Video string) string {
 		"-y", audioPath,
 	)
 	if err := cmd.Run(); err != nil {
-		return "" // no audio track or ffmpeg error
+		return ""
 	}
 
 	data, err := os.ReadFile(audioPath)
@@ -215,18 +215,24 @@ func (j *JudgeEvaluator) evaluatePointwise(ctx context.Context, input models.Tes
 			req.Params["audio_mime_type"] = output.ContentType
 		} else if strings.HasPrefix(output.ContentType, "image") && output.Content != "" {
 			req.ReferenceInputs = []string{output.Content}
-		} else if strings.HasPrefix(output.ContentType, "video") && output.Content != "" {
-			// Check if this judge wants to evaluate audio (e.g. "audio-stt-judge")
+		} else if strings.HasPrefix(output.ContentType, "video") && (output.Content != "" || output.MediaPath != "") {
+			// Resolve video to a file path for ffmpeg
+			videoPath := resolveVideoPath(output)
+			// Clean up temp file if we created one (not MediaPath)
+			if videoPath != "" && output.MediaPath == "" {
+				defer os.Remove(videoPath)
+			}
+
 			wantsAudio := strings.Contains(strings.ToLower(j.name), "audio") ||
 				strings.Contains(strings.ToLower(j.name), "stt")
-			if wantsAudio {
-				audioB64 := extractVideoAudio(output.Content)
+			if wantsAudio && videoPath != "" {
+				audioB64 := extractVideoAudioFromFile(videoPath)
 				if audioB64 != "" {
 					req.Modality = models.ModalityAudio
 					req.ReferenceInputs = []string{audioB64}
 					req.Params["audio_mime_type"] = "audio/wav"
 				}
-			} else {
+			} else if videoPath != "" {
 				numFrames := 4
 				if nf, ok := j.params["num_sample_frames"]; ok {
 					if n, ok := nf.(int); ok {
@@ -235,7 +241,7 @@ func (j *JudgeEvaluator) evaluatePointwise(ctx context.Context, input models.Tes
 						numFrames = int(n)
 					}
 				}
-				frames := extractVideoFrames(output.Content, numFrames)
+				frames := extractVideoFramesFromFile(videoPath, numFrames)
 				if len(frames) > 0 {
 					req.ReferenceInputs = frames
 				}
