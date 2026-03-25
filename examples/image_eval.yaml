@@ -1,0 +1,78 @@
+name: "Image Generation Eval"
+description: "Evaluate DALL-E 3 image generation with GPT-4o vision as judge"
+
+dataset:
+  inline:
+    id: "image-gen-v1"
+    name: "Image Generation Prompts"
+    version: "1.0.0"
+    modality: image
+    test_cases:
+      - id: "img-1"
+        input: "A serene Japanese garden with a red bridge over a koi pond, cherry blossoms falling, watercolor style"
+        tags: ["landscape", "style-transfer"]
+      - id: "img-2"
+        input: "A photorealistic close-up of a golden retriever puppy wearing tiny sunglasses"
+        tags: ["animal", "photorealistic"]
+      - id: "img-3"
+        input: "An isometric 3D render of a cozy coffee shop interior with warm lighting"
+        tags: ["3d", "interior"]
+      - id: "img-4"
+        input: "A minimalist flat-lay photograph of a desk with a laptop, coffee cup, succulent plant, and notebook on a white marble surface"
+        tags: ["product", "flat-lay", "minimalist"]
+      - id: "img-5"
+        input: "A cyberpunk street scene at night with neon signs in Japanese, rain-slicked roads, and a lone figure with an umbrella"
+        tags: ["sci-fi", "cyberpunk", "atmosphere"]
+      - id: "img-6"
+        input: "An oil painting of a stormy sea with a lighthouse on a rocky cliff, dramatic clouds, in the style of J.M.W. Turner"
+        tags: ["fine-art", "style-transfer", "seascape"]
+      - id: "img-7"
+        input: "A cute cartoon mascot of a robot chef holding a spatula and wearing a tall chef hat, flat vector illustration with bold outlines"
+        tags: ["character-design", "illustration", "cartoon"]
+      - id: "img-8"
+        input: "An aerial photograph of terraced rice paddies in Bali at golden hour, lush green with water reflections"
+        tags: ["landscape", "aerial", "photorealistic"]
+      - id: "img-9"
+        input: "A detailed botanical illustration of a Venus flytrap with labeled parts, scientific illustration style on aged parchment"
+        tags: ["scientific", "illustration", "botanical"]
+      - id: "img-10"
+        input: "A split-screen comparison showing the same city block in 1920 and 2024, sepia tone on the left and modern color on the right"
+        tags: ["composite", "historical", "creative"]
+
+generator:
+  provider: openai
+  model: dall-e-3
+  params:
+    size: "1024x1024"
+    quality: "hd"
+
+evaluators:
+  - name: "visual-quality-judge"
+    type: ai_judge
+    provider: openai
+    model: gpt-4o
+    mode: pointwise
+    rubric: |
+      Evaluate this AI-generated image:
+      - Prompt adherence: Does the image match what was requested?
+      - Visual quality: Is it sharp, well-composed, and free of artifacts?
+      - Aesthetic appeal: Is it visually pleasing?
+      - Coherence: Are all elements in the image logically consistent (no extra limbs, floating objects, etc.)?
+    dimensions:
+      - prompt_adherence
+      - visual_quality
+      - aesthetic_appeal
+      - coherence
+    scale: [1, 5]
+    threshold: 0.7
+
+  - name: "clip-score"
+    type: metric
+    metric: clip_score
+
+pipeline:
+  concurrency: 2
+  timeout_seconds: 120
+
+report:
+  output_path: "./image_eval_report.html"

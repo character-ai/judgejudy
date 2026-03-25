@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{.Title}}</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #fff; color: #1a1a1a; line-height: 1.5; }
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+a { color: #2563eb; text-decoration: none; }
+
+/* Header */
+.header { border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 24px; }
+.header-top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
+.header h1 { font-size: 1.5rem; font-weight: 700; color: #111; }
+.header-meta { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 24px; margin-top: 12px; font-size: 0.875rem; color: #555; }
+.header-meta dt { font-weight: 600; color: #333; display: inline; }
+.header-meta dd { display: inline; margin-left: 4px; }
+.badge { display: inline-block; padding: 4px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.badge-pass { background: #dcfce7; color: #166534; }
+.badge-fail { background: #fee2e2; color: #991b1b; }
+
+/* Summary Cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; background: #fafafa; }
+.card-header { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #555; margin-bottom: 8px; }
+.card-score { font-size: 2rem; font-weight: 800; }
+.card-details { font-size: 0.8rem; color: #666; margin-top: 6px; line-height: 1.6; }
+.color-green { color: #16a34a; }
+.color-yellow { color: #ca8a04; }
+.color-red { color: #dc2626; }
+.bg-green { border-left: 4px solid #16a34a; }
+.bg-yellow { border-left: 4px solid #ca8a04; }
+.bg-red { border-left: 4px solid #dc2626; }
+
+/* Sections */
+.section { margin-bottom: 32px; }
+.section h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: 16px; color: #111; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+
+/* Histograms */
+.histograms { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+.histogram-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
+.histogram-card h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; }
+
+/* Comparison table */
+table.comparison { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+table.comparison th, table.comparison td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+table.comparison th { background: #f9fafb; font-weight: 600; color: #333; }
+table.comparison tr:hover { background: #f9fafb; }
+.delta-positive { color: #16a34a; font-weight: 600; }
+.delta-negative { color: #dc2626; font-weight: 600; }
+
+/* Results table */
+table.results { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+table.results th { padding: 10px 12px; text-align: left; border-bottom: 2px solid #d1d5db; background: #f9fafb; font-weight: 600; color: #333; cursor: pointer; user-select: none; white-space: nowrap; }
+table.results th:hover { background: #f3f4f6; }
+table.results th .sort-arrow { margin-left: 4px; font-size: 0.7rem; color: #999; }
+table.results td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+table.results tr.result-row { cursor: pointer; }
+table.results tr.result-row:hover { background: #f9fafb; }
+table.results tr.expanded-row { display: none; }
+table.results tr.expanded-row.open { display: table-row; }
+table.results tr.expanded-row td { background: #f9fafb; padding: 16px 24px; }
+.expand-content { max-width: 100%; overflow-x: auto; }
+.expand-content h4 { font-size: 0.85rem; font-weight: 600; margin: 12px 0 4px 0; color: #333; }
+.expand-content h4:first-child { margin-top: 0; }
+.expand-content pre { background: #f3f4f6; padding: 10px; border-radius: 4px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; }
+.expand-content img, .expand-content video, .expand-content audio { max-width: 100%; margin-top: 8px; border-radius: 4px; }
+.reasoning-block { background: #fff; border: 1px solid #e5e7eb; border-radius: 4px; padding: 10px; margin-top: 4px; font-size: 0.8rem; color: #555; }
+.pass-badge { color: #16a34a; font-weight: 600; }
+.fail-badge { color: #dc2626; font-weight: 600; }
+
+/* Print */
+@media print {
+  .container { max-width: 100%; padding: 0; }
+  table.results th { cursor: default; }
+  tr.expanded-row { display: table-row !important; }
+}
+@media (max-width: 640px) {
+  .header-top { flex-direction: column; }
+  .cards { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <h1>{{.Title}}</h1>
+      {{if .Run}}
+      <span class="badge {{if ge .Run.Aggregate.TotalPassRate 0.5}}badge-pass{{else}}badge-fail{{end}}">
+        {{if ge .Run.Aggregate.TotalPassRate 0.5}}PASSED{{else}}FAILED{{end}}
+      </span>
+      {{end}}
+    </div>
+    {{if .Run}}
+    <dl class="header-meta">
+      <div><dt>Run ID:</dt><dd>{{.Run.ID}}</dd></div>
+      <div><dt>Timestamp:</dt><dd>{{.Run.Timestamp.Format "2006-01-02 15:04:05 MST"}}</dd></div>
+      <div><dt>Dataset:</dt><dd>{{.Run.DatasetID}} v{{.Run.DatasetVersion}}</dd></div>
+      <div><dt>Generator:</dt><dd>{{.Run.GeneratorConfig.Provider}} / {{.Run.GeneratorConfig.Model}}</dd></div>
+      <div><dt>Total Cost:</dt><dd>${{formatFloat .Run.TotalCostUSD 4}}</dd></div>
+      <div><dt>Duration:</dt><dd>{{formatFloat .Run.DurationSeconds 1}}s</dd></div>
+      <div><dt>Pass Rate:</dt><dd>{{formatFloat (multiply .Run.Aggregate.TotalPassRate 100) 1}}%</dd></div>
+      <div><dt>Report Generated:</dt><dd>{{.Generated}}</dd></div>
+    </dl>
+    {{end}}
+  </div>
+
+  {{if .Run}}
+  <!-- Summary Cards -->
+  <div class="section">
+    <h2>Evaluator Summary</h2>
+    <div class="cards">
+      {{range .Run.EvaluatorNames}}
+      {{$mean := index $.Run.Aggregate.MeanScores .}}
+      {{$median := index $.Run.Aggregate.MedianScores .}}
+      {{$p5 := index $.Run.Aggregate.P5Scores .}}
+      {{$p95 := index $.Run.Aggregate.P95Scores .}}
+      {{$pass := index $.Run.Aggregate.PassRates .}}
+      {{$cfg := evalConfig .}}
+      <div class="card {{scoreColorBg $mean}}">
+        <div class="card-header">{{.}}</div>
+        <div class="card-score {{scoreColor $mean}}">{{formatFloat $mean 3}}</div>
+        <div class="card-details">
+          Median: {{formatFloat $median 3}}<br>
+          P5–P95: {{formatFloat $p5 3}} – {{formatFloat $p95 3}}<br>
+          Pass Rate: {{formatFloat (multiply $pass 100) 1}}%<br>
+          {{if $cfg.Dimensions}}<strong>Dimensions:</strong> {{range $i, $d := $cfg.Dimensions}}{{if $i}}, {{end}}{{$d}}{{end}}<br>{{end}}
+          <span style="color:#888;font-size:0.75rem">{{if $cfg.Rubric}}{{truncate $cfg.Rubric 200}}{{else}}{{metricDesc .}}{{end}}</span>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Score Distribution -->
+  <div class="section">
+    <h2>Score Distributions</h2>
+    <div class="histograms">
+      {{range .Run.EvaluatorNames}}
+      {{$bins := index $.Histograms .}}
+      {{$max := maxBin $bins}}
+      <div class="histogram-card">
+        <h3>{{.}}</h3>
+        <svg viewBox="0 0 320 140" width="100%" style="max-width:320px">
+          {{range $i, $count := $bins}}
+          {{$binStart := divFloat $i 10.0}}
+          {{$barHeight := 0.0}}{{if gt $max 0}}{{$barHeight = divFloat $count $max}}{{end}}
+          {{$x := multiply $i 30}}
+          {{$h := multiply $barHeight 100.0}}
+          {{$y := subtract 120.0 $h}}
+          <rect x="{{add $x 4}}" y="{{$y}}" width="24" height="{{$h}}" rx="2" fill="{{binColor $binStart}}" opacity="0.85"/>
+          {{if gt $count 0}}
+          <text x="{{add $x 16}}" y="{{subtract $y 3}}" text-anchor="middle" font-size="9" fill="#555">{{$count}}</text>
+          {{end}}
+          <text x="{{add $x 16}}" y="135" text-anchor="middle" font-size="8" fill="#888">.{{$i}}</text>
+          {{end}}
+        </svg>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  {{if .Comparison}}
+  <!-- Comparison -->
+  <div class="section">
+    <h2>Comparison: {{.Comparison.BaselineRunID}} vs {{.Comparison.CandidateRunID}}</h2>
+    <table class="comparison">
+      <thead>
+        <tr>
+          <th>Evaluator</th>
+          <th>Baseline Mean</th>
+          <th>Candidate Mean</th>
+          <th>Delta</th>
+          <th>% Change</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $name, $delta := .Comparison.Deltas}}
+        <tr>
+          <td>{{$name}}</td>
+          <td>{{formatFloat $delta.BaselineMean 4}}</td>
+          <td>{{formatFloat $delta.CandidateMean 4}}</td>
+          <td class="{{if $delta.Improved}}delta-positive{{else}}delta-negative{{end}}">
+            {{if $delta.Improved}}+{{end}}{{formatFloat $delta.AbsoluteDelta 4}}
+          </td>
+          <td class="{{if $delta.Improved}}delta-positive{{else}}delta-negative{{end}}">
+            {{if $delta.Improved}}+{{end}}{{formatFloat $delta.PercentDelta 1}}%
+          </td>
+          <td>
+            {{if $delta.Improved}}<span class="pass-badge">Improved</span>{{else}}<span class="fail-badge">Regressed</span>{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{end}}
+
+  <!-- Detailed Results -->
+  <div class="section">
+    <h2>Detailed Results ({{len .Run.Results}} test cases)</h2>
+    <div style="overflow-x:auto">
+    <table class="results" id="resultsTable">
+      <thead>
+        <tr>
+          <th data-col="0" onclick="sortTable(0, 'string')">Test Case ID <span class="sort-arrow">&#x25B4;&#x25BE;</span></th>
+          <th data-col="1" onclick="sortTable(1, 'string')">Prompt <span class="sort-arrow">&#x25B4;&#x25BE;</span></th>
+          <th data-col="2" onclick="sortTable(2, 'string')">Output <span class="sort-arrow">&#x25B4;&#x25BE;</span></th>
+          {{range $i, $name := .Run.EvaluatorNames}}
+          <th data-col="{{add 3 $i}}" onclick="sortTable({{add 3 $i}}, 'number')">{{$name}} <span class="sort-arrow">&#x25B4;&#x25BE;</span></th>
+          {{end}}
+          <th data-col="{{add 3 (len .Run.EvaluatorNames)}}" onclick="sortTable({{add 3 (len .Run.EvaluatorNames)}}, 'string')">Status <span class="sort-arrow">&#x25B4;&#x25BE;</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $idx, $result := .Run.Results}}
+        <tr class="result-row" onclick="toggleRow({{$idx}})">
+          <td>{{$result.TestCaseID}}</td>
+          <td title="{{$result.Input}}">{{truncate $result.Input 80}}</td>
+          <td>{{if isMediaType $result.GeneratedOutput.ContentType "audio"}}🔊 Audio{{else if isMediaType $result.GeneratedOutput.ContentType "image"}}🖼 Image{{else if isMediaType $result.GeneratedOutput.ContentType "video"}}🎬 Video{{else}}{{truncate $result.GeneratedOutput.Content 60}}{{end}}</td>
+          {{range $.Run.EvaluatorNames}}
+          {{$score := index $result.Scores .}}
+          <td class="{{scoreColor $score.Value}}">{{formatFloat $score.Value 3}}</td>
+          {{end}}
+          <td>
+            {{if allPassed $result.Scores}}<span class="pass-badge">PASS</span>{{else}}<span class="fail-badge">FAIL</span>{{end}}
+          </td>
+        </tr>
+        <tr class="expanded-row" id="detail-{{$idx}}">
+          <td colspan="{{add 4 (len $.Run.EvaluatorNames)}}">
+            <div class="expand-content">
+              <h4>Test Case ID</h4>
+              <pre>{{$result.TestCaseID}}</pre>
+              <h4>Prompt</h4>
+              <pre>{{$result.Input}}</pre>
+              <h4>Generated Output</h4>
+              {{if isMediaType $result.GeneratedOutput.ContentType "image"}}
+              <img src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}" alt="output image"/>
+              {{else if isMediaType $result.GeneratedOutput.ContentType "audio"}}
+              <audio controls src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}"></audio>
+              {{else if isMediaType $result.GeneratedOutput.ContentType "video"}}
+              <video controls src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}"></video>
+              {{else}}
+              <pre>{{$result.GeneratedOutput.Content}}</pre>
+              {{end}}
+              <h4>Evaluator Scores</h4>
+              {{range $.Run.EvaluatorNames}}
+              {{$score := index $result.Scores .}}
+              {{$ecfg := evalConfig .}}
+              <div style="margin-bottom:12px; padding:10px; border:1px solid #e5e7eb; border-radius:6px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <strong>{{.}}</strong>
+                  <span>
+                    <span class="{{scoreColor $score.Value}}" style="font-size:1.1rem;font-weight:700">{{formatFloat $score.Value 3}}</span>
+                    {{if $score.Passed}} {{if derefBool $score.Passed}}<span class="pass-badge">PASS</span>{{else}}<span class="fail-badge">FAIL</span>{{end}}{{end}}
+                  </span>
+                </div>
+                {{if $ecfg.Dimensions}}<div style="font-size:0.75rem;color:#888;margin-bottom:4px">Evaluates: {{range $i, $d := $ecfg.Dimensions}}{{if $i}}, {{end}}{{$d}}{{end}}</div>{{end}}
+                {{if $score.Reasoning}}
+                <div class="reasoning-block"><strong>Why this score:</strong> {{$score.Reasoning}}</div>
+                {{end}}
+              </div>
+              {{end}}
+            </div>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {{end}}
+
+</div>
+
+<script>
+function toggleRow(idx) {
+  var el = document.getElementById('detail-' + idx);
+  if (el) el.classList.toggle('open');
+}
+
+function sortTable(colIdx, type) {
+  var table = document.getElementById('resultsTable');
+  var tbody = table.tBodies[0];
+  var rowPairs = [];
+  for (var i = 0; i < tbody.rows.length; i += 2) {
+    rowPairs.push([tbody.rows[i], tbody.rows[i + 1]]);
+  }
+  var dir = table.getAttribute('data-sort-dir-' + colIdx) === 'asc' ? 'desc' : 'asc';
+  table.setAttribute('data-sort-dir-' + colIdx, dir);
+  rowPairs.sort(function(a, b) {
+    var aVal = a[0].cells[colIdx].textContent.trim();
+    var bVal = b[0].cells[colIdx].textContent.trim();
+    if (type === 'number') {
+      aVal = parseFloat(aVal) || 0;
+      bVal = parseFloat(bVal) || 0;
+      return dir === 'asc' ? aVal - bVal : bVal - aVal;
+    }
+    return dir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+  });
+  for (var j = 0; j < rowPairs.length; j++) {
+    tbody.appendChild(rowPairs[j][0]);
+    tbody.appendChild(rowPairs[j][1]);
+  }
+}
+</script>
+</body>
+</html>

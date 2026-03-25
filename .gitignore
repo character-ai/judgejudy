@@ -1,0 +1,9 @@
+.env
+.idea
+JUDGEJUDY-SPEC.md
+audio_eval_report.html
+image_eval_report.html
+judgejudy
+report.html
+multi_judge_report.html
+video_eval_report.html

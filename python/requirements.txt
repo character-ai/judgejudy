@@ -1,0 +1,13 @@
+bert-score>=0.3.13
+rouge-score>=0.1.2
+nltk>=3.8
+torch>=2.0
+torchaudio>=2.0
+torchvision>=0.15
+torchmetrics>=1.0
+clean-fid>=0.1.35
+lpips>=0.1.4
+pesq>=0.0.4
+pystoi>=0.4
+opencv-python>=4.8
+numpy>=1.24

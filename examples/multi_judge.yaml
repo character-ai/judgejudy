@@ -1,0 +1,47 @@
+name: "Multi-Judge Consensus"
+description: "Evaluate with 3 judges and composite scoring"
+
+dataset:
+  path: "./examples/text_dataset.yaml"
+
+generator:
+  provider: openai
+  model: gpt-4o
+
+evaluators:
+  - name: "consensus"
+    type: composite
+    threshold: 0.75
+    children:
+      - name: "judge-claude"
+        type: ai_judge
+        provider: anthropic
+        model: claude-sonnet-4-6
+        mode: pointwise
+        rubric: "Rate overall quality from 1-5. Consider accuracy, clarity, and helpfulness."
+        dimensions: ["overall_quality"]
+        scale: [1, 5]
+        weight: 0.4
+
+      - name: "judge-gpt4"
+        type: ai_judge
+        provider: openai
+        model: gpt-4o
+        mode: pointwise
+        rubric: "Rate overall quality from 1-5. Consider accuracy, clarity, and helpfulness."
+        dimensions: ["overall_quality"]
+        scale: [1, 5]
+        weight: 0.4
+
+      - name: "judge-gemini"
+        type: ai_judge
+        provider: google
+        model: gemini-2.5-pro
+        mode: pointwise
+        rubric: "Rate overall quality from 1-5. Consider accuracy, clarity, and helpfulness."
+        dimensions: ["overall_quality"]
+        scale: [1, 5]
+        weight: 0.2
+
+report:
+  output_path: "./multi_judge_report.html"

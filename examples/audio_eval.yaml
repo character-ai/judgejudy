@@ -1,0 +1,79 @@
+name: "TTS Quality Eval"
+description: "Evaluate OpenAI TTS quality"
+
+dataset:
+  inline:
+    id: "tts-v1"
+    name: "TTS Test Sentences"
+    version: "1.0.0"
+    modality: audio
+    test_cases:
+      - id: "tts-1"
+        input: "The quick brown fox jumps over the lazy dog."
+        tags: ["pangram"]
+      - id: "tts-2"
+        input: "In a hole in the ground there lived a hobbit. Not a nasty, dirty, wet hole, filled with the ends of worms and an oozy smell."
+        tags: ["literary", "long"]
+      - id: "tts-3"
+        input: "Please confirm your appointment for March twenty-fifth at two thirty PM."
+        tags: ["conversational", "numbers"]
+      - id: "tts-4"
+        input: "Breaking news: scientists have discovered a new species of deep-sea jellyfish that glows in seven different colors."
+        tags: ["news", "announcement"]
+      - id: "tts-5"
+        input: "I'm sorry, but I'm not able to process your refund at this time. Could you please provide your order number so I can look into this further?"
+        tags: ["customer-service", "apologetic"]
+      - id: "tts-6"
+        input: "To make a classic French omelette, crack three eggs into a bowl, add a pinch of salt, and whisk vigorously for thirty seconds."
+        tags: ["instructional", "cooking"]
+      - id: "tts-7"
+        input: "Warning: severe thunderstorms are expected in the metropolitan area between 4 PM and 9 PM. Residents are advised to stay indoors."
+        tags: ["emergency", "weather"]
+      - id: "tts-8"
+        input: "She sells seashells by the seashore. The shells she sells are seashells, I'm sure."
+        tags: ["tongue-twister", "articulation"]
+      - id: "tts-9"
+        input: "Good morning, everyone. Today we'll be reviewing Q3 results and discussing our roadmap for the next quarter. Let's get started."
+        tags: ["meeting", "professional"]
+      - id: "tts-10"
+        input: "Once upon a time, in a kingdom far, far away, there lived a young princess who dreamed of exploring the stars."
+        tags: ["storytelling", "fairy-tale"]
+
+generator:
+  provider: openai
+  model: tts-1-hd
+  params:
+    voice: "nova"
+    response_format: "wav"
+
+evaluators:
+  - name: "audio-quality-judge"
+    type: ai_judge
+    provider: google
+    model: gemini-2.0-flash
+    mode: pointwise
+    rubric: |
+      Evaluate this text-to-speech audio:
+      - Naturalness: Does it sound like a real human speaking?
+      - Intelligibility: Can every word be clearly understood?
+      - Prosody: Is the rhythm, stress, and intonation appropriate?
+      - Emotional tone: Does the delivery match the content's tone?
+    dimensions:
+      - naturalness
+      - intelligibility
+      - prosody
+      - emotional_tone
+    scale: [1, 5]
+
+  - name: "utmos"
+    type: metric
+    metric: utmos
+    params:
+      sample_rate: 16000
+
+pipeline:
+  concurrency: 3
+  timeout_seconds: 60
+
+report:
+  output_path: "./audio_eval_report.html"

@@ -1,0 +1,129 @@
+name: "Video Generation Eval"
+description: "Evaluate video generation quality and intent fidelity"
+
+dataset:
+  inline:
+    id: "video-gen-v1"
+    name: "Video Generation Prompts"
+    version: "1.0.0"
+    modality: video
+    test_cases:
+      - id: "vid-1"
+        input: "A timelapse of a flower blooming in a garden, 5 seconds, smooth motion"
+        tags: ["timelapse", "nature"]
+      - id: "vid-2"
+        input: "A drone shot flying over a coastal city at sunset, cinematic"
+        tags: ["aerial", "cinematic"]
+      - id: "vid-3"
+        input: "A cat playing with a ball of yarn on a wooden floor, natural movement"
+        tags: ["animal", "realistic"]
+      - id: "vid-4"
+        input: "A candle flame flickering gently in a dark room, close-up macro shot, slow motion"
+        tags: ["macro", "slow-motion", "ambient"]
+      - id: "vid-5"
+        input: "A person walking through a snowy forest, camera following from behind, footprints appearing in fresh snow"
+        tags: ["tracking-shot", "winter", "human"]
+      - id: "vid-6"
+        input: "Ocean waves crashing against rocks on a cliff, white spray and foam, wide angle, dramatic lighting"
+        tags: ["nature", "dramatic", "seascape"]
+      - id: "vid-7"
+        input: "A cup of coffee being poured in slow motion, steam rising, warm café lighting, top-down perspective"
+        tags: ["product", "slow-motion", "food"]
+      - id: "vid-8"
+        input: "A busy Tokyo intersection at night with pedestrians crossing, cars passing, and neon signs reflecting on wet pavement"
+        tags: ["urban", "night", "crowd"]
+      - id: "vid-9"
+        input: "A hummingbird hovering near a red flower, wings in slow motion, shallow depth of field, nature documentary style"
+        tags: ["wildlife", "slow-motion", "documentary"]
+      - id: "vid-10"
+        input: "An astronaut floating in zero gravity inside a space station, Earth visible through the window, cinematic lighting"
+        tags: ["sci-fi", "space", "cinematic"]
+
+generator:
+  provider: wavespeed
+  model: /v3/bytedance/seedance-v1.5-pro/text-to-video
+  params:
+    model_path: "/v3/bytedance/seedance-v1.5-pro/text-to-video"
+    duration: 5
+
+evaluators:
+  - name: "video-quality-judge"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Evaluate this AI-generated video (shown as sampled frames):
+      - Prompt adherence: Does the video match what was requested?
+      - Visual quality: Are frames sharp and well-rendered?
+      - Temporal consistency: Do objects remain consistent across frames?
+      - Motion naturalness: Does movement look physically plausible?
+      - Aesthetic quality: Is the overall video visually appealing?
+    dimensions:
+      - prompt_adherence
+      - visual_quality
+      - temporal_consistency
+      - motion_naturalness
+      - aesthetic_quality
+    scale: [1, 5]
+    params:
+      num_sample_frames: 8
+
+  - name: "realism-judge"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Evaluate the realism of this AI-generated video (shown as sampled frames).
+      Focus specifically on whether it looks like real footage or obviously AI-generated:
+      - Physical plausibility: Do objects obey gravity, inertia, and physics?
+      - Human anatomy: If people are shown, are proportions and movements natural? No extra fingers, distorted faces, or unnatural poses?
+      - Lighting consistency: Are shadows, reflections, and lighting consistent across the scene?
+      - Texture quality: Do surfaces look realistic? No melting, morphing, or smearing artifacts?
+      - Overall believability: Could this pass as real footage to a casual viewer?
+    dimensions:
+      - physical_plausibility
+      - human_anatomy
+      - lighting_consistency
+      - texture_quality
+      - overall_believability
+    scale: [1, 5]
+    params:
+      num_sample_frames: 8
+
+  - name: "audio-stt-judge"
+    type: ai_judge
+    provider: google
+    model: gemini-2.0-flash
+    mode: pointwise
+    rubric: |
+      This is an AI-generated video. Evaluate the audio track (if present):
+      - Audio presence: Does the video have an audio track at all? If not, score 3 (neutral).
+      - Audio-visual sync: Does the audio match what's happening visually?
+      - Audio quality: Is the audio clear, without artifacts, distortion, or unnatural sounds?
+      - Realism: Do the sounds match what you'd expect from the scene (ambient noise, effects, etc.)?
+      If there is no audio, give a neutral score of 3 for all dimensions.
+    dimensions:
+      - audio_presence
+      - audio_visual_sync
+      - audio_quality
+      - audio_realism
+    scale: [1, 5]
+
+  - name: "temporal-consistency"
+    type: metric
+    metric: temporal_consistency
+
+  - name: "clip-temporal"
+    type: metric
+    metric: clip_temporal
+    params:
+      num_frames: 16
+
+pipeline:
+  concurrency: 1
+  timeout_seconds: 300
+
+report:
+  output_path: "./video_eval_report.html"

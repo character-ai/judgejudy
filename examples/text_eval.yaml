@@ -1,0 +1,92 @@
+name: "Text Generation Quality"
+description: "Evaluate GPT-4o text generation with Claude as judge"
+
+dataset:
+  inline:
+    id: "text-quality-v1"
+    name: "Text Quality Basics"
+    version: "1.0.0"
+    modality: text
+    test_cases:
+      - id: "tc-1"
+        input: "Explain quantum entanglement to a 10-year-old in 3 sentences."
+        expected_output: "Quantum entanglement is when two tiny particles become linked so that whatever happens to one instantly affects the other, no matter how far apart they are. It's like having two magic dice that always land on the same number, even if one is on Earth and the other is on the Moon. Scientists use this strange connection to build super-fast computers and send secret messages."
+        tags: ["simplification", "science"]
+      - id: "tc-2"
+        input: "Write a professional email declining a meeting invitation due to a scheduling conflict."
+        expected_output: "Subject: Unable to Attend Meeting\n\nHi,\n\nThank you for the invitation. Unfortunately, I have a prior commitment at that time and won't be able to attend. I'd appreciate it if you could share the meeting notes afterward, and I'm happy to follow up on any action items. Please let me know if there's an alternative time that works.\n\nBest regards"
+        tags: ["business", "email"]
+      - id: "tc-3"
+        input: "Summarize the key differences between SQL and NoSQL databases."
+        expected_output: "SQL databases are relational, storing data in structured tables with predefined schemas and using SQL for queries. NoSQL databases are non-relational, supporting flexible schemas with document, key-value, columnar, or graph data models. SQL databases excel at complex joins and transactions, while NoSQL databases offer better horizontal scalability and performance for large-scale, unstructured data."
+        tags: ["technical", "comparison"]
+      - id: "tc-4"
+        input: "Write a haiku about debugging code at 3 AM."
+        expected_output: "Screen glows in the dark\nOne missing semicolon\nSleep can wait till dawn"
+        tags: ["creative", "poetry"]
+      - id: "tc-5"
+        input: "What are three practical tips for reducing memory usage in a Python application?"
+        expected_output: "First, use generators instead of lists when iterating over large datasets, as they yield items one at a time without loading everything into memory. Second, leverage __slots__ in classes to prevent the creation of per-instance __dict__, significantly reducing memory overhead for objects created in large numbers. Third, use memory-efficient data structures like array.array for homogeneous numeric data instead of lists, or consider numpy arrays for numerical computation."
+        tags: ["technical", "python", "optimization"]
+      - id: "tc-6"
+        input: "Explain the difference between authentication and authorization in one paragraph."
+        expected_output: "Authentication is the process of verifying who a user is, typically through credentials like a username and password, biometrics, or tokens. Authorization, on the other hand, determines what an authenticated user is allowed to do — which resources they can access and what actions they can perform. In short, authentication answers 'who are you?' while authorization answers 'what are you allowed to do?'"
+        tags: ["security", "concepts"]
+      - id: "tc-7"
+        input: "Convert this pseudocode to a plain English explanation: for each item in cart, if item.price > 100, apply 10% discount, else apply 5% discount."
+        expected_output: "Go through every item in the shopping cart. For each item, check its price. If the price is more than $100, reduce it by 10%. Otherwise, reduce it by 5%. This means more expensive items get a larger discount."
+        tags: ["code-explanation", "simplification"]
+      - id: "tc-8"
+        input: "List 5 common HTTP status codes and what they mean, in a concise format."
+        expected_output: "200 OK — The request succeeded. 301 Moved Permanently — The resource has been permanently moved to a new URL. 404 Not Found — The server cannot find the requested resource. 429 Too Many Requests — The client has sent too many requests in a given timeframe. 500 Internal Server Error — The server encountered an unexpected condition that prevented it from fulfilling the request."
+        tags: ["technical", "web", "reference"]
+      - id: "tc-9"
+        input: "Write a brief product description for a noise-canceling wireless headphone aimed at remote workers."
+        expected_output: "Focus without distractions. These wireless noise-canceling headphones are built for the remote worker who needs deep concentration. With adaptive ANC that filters out household noise, a 30-hour battery for all-day use, and a comfortable over-ear design for extended wear, they keep you locked in. Crystal-clear microphones ensure your voice comes through perfectly on every call."
+        tags: ["marketing", "copywriting"]
+      - id: "tc-10"
+        input: "Explain the CAP theorem in distributed systems in 2-3 sentences."
+        expected_output: "The CAP theorem states that a distributed system can guarantee at most two of three properties simultaneously: Consistency (all nodes see the same data), Availability (every request gets a response), and Partition tolerance (the system works despite network failures). Since network partitions are unavoidable in practice, system designers must choose between consistency and availability during a partition. This is why databases like DynamoDB favor availability while systems like ZooKeeper favor consistency."
+        tags: ["distributed-systems", "theory"]
+
+generator:
+  provider: openai
+  model: gpt-4o
+  params:
+    temperature: 0.7
+    max_tokens: 500
+
+evaluators:
+  - name: "quality-judge"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Evaluate the response on these criteria:
+      - Accuracy: Is the information factually correct?
+      - Clarity: Is the response clear and easy to understand?
+      - Relevance: Does it address the prompt directly?
+      - Conciseness: Is it appropriately concise without losing important details?
+    dimensions:
+      - accuracy
+      - clarity
+      - relevance
+      - conciseness
+    scale: [1, 5]
+    threshold: 0.7
+
+  - name: "bertscore"
+    type: metric
+    metric: bertscore
+    params:
+      model_type: "roberta-base"
+
+pipeline:
+  concurrency: 3
+  timeout_seconds: 60
+  cache_enabled: true
+
+report:
+  output_path: "./text_eval_report.html"
+  title: "Text Generation Quality Report"

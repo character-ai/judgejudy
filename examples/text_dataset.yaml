@@ -1,0 +1,45 @@
+id: "multi-judge-v1"
+name: "Multi-Judge Text Dataset"
+version: "1.0.0"
+modality: text
+test_cases:
+  - id: "mj-1"
+    input: "What causes seasons on Earth?"
+    expected_output: "Seasons are caused by the tilt of Earth's axis at about 23.5 degrees relative to its orbital plane. As Earth orbits the Sun, this tilt causes different hemispheres to receive varying amounts of direct sunlight throughout the year. When the Northern Hemisphere is tilted toward the Sun, it experiences summer while the Southern Hemisphere has winter, and vice versa."
+    tags: ["science", "explanation"]
+  - id: "mj-2"
+    input: "Write a function signature and docstring for a Python function that validates an email address."
+    expected_output: "def validate_email(email: str) -> bool:\n    \"\"\"Validate whether the given string is a properly formatted email address.\n\n    Checks for the presence of exactly one '@' symbol, a non-empty local part,\n    and a domain with at least one dot. Does not verify that the email exists.\n\n    Args:\n        email: The string to validate as an email address.\n\n    Returns:\n        True if the email format is valid, False otherwise.\n    \"\"\""
+    tags: ["coding", "python", "documentation"]
+  - id: "mj-3"
+    input: "Compare the pros and cons of microservices vs monolithic architecture in 3-4 sentences."
+    expected_output: "Microservices allow independent deployment, technology diversity, and scaling of individual components, but introduce complexity in service communication, distributed debugging, and operational overhead. Monoliths are simpler to develop, test, and deploy as a single unit, but become harder to scale and maintain as they grow. Microservices suit large teams working on complex, evolving systems, while monoliths work well for smaller teams and early-stage products where simplicity matters most."
+    tags: ["architecture", "comparison"]
+  - id: "mj-4"
+    input: "Explain what a hash table is to someone who knows arrays but not hash tables."
+    expected_output: "A hash table is like an array where instead of using numeric indices (0, 1, 2...), you can use meaningful keys like names or words to store and retrieve values. It works by running each key through a special function called a hash function, which converts the key into an array index. This lets you look up any value almost instantly by its key, rather than searching through every element. Think of it like a dictionary where you can jump directly to any word instead of flipping through every page."
+    tags: ["data-structures", "explanation", "teaching"]
+  - id: "mj-5"
+    input: "Draft a one-paragraph incident postmortem summary for a 45-minute API outage caused by a misconfigured database connection pool."
+    expected_output: "On March 15, 2025 at 14:32 UTC, the API experienced a 45-minute outage affecting all authenticated endpoints. Root cause was a configuration change deployed at 14:30 UTC that reduced the database connection pool from 50 to 5 connections, causing request queuing and cascading timeouts under normal traffic load. The issue was detected by automated alerting at 14:35 UTC and mitigated at 15:17 UTC by rolling back the configuration change. Going forward, we are adding connection pool size to our deployment validation checks and establishing minimum thresholds that cannot be breached without explicit approval."
+    tags: ["incident-response", "writing", "devops"]
+  - id: "mj-6"
+    input: "What is the difference between concurrency and parallelism?"
+    expected_output: "Concurrency is about dealing with multiple tasks at once by interleaving their execution — tasks may start, run, and complete in overlapping time periods, but not necessarily simultaneously. Parallelism is about actually executing multiple tasks at the same instant, which requires multiple CPU cores or processors. A single-core computer can be concurrent (switching between tasks rapidly) but not parallel. Concurrency is a design pattern for structuring programs, while parallelism is an execution strategy for speeding them up."
+    tags: ["computer-science", "concepts"]
+  - id: "mj-7"
+    input: "Write a brief, friendly rejection message for a job applicant who made it to the final round but wasn't selected."
+    expected_output: "Hi [Name],\n\nThank you so much for the time you invested in our interview process. You made it to our final round, which speaks to your strong qualifications and the impression you made on our team. After careful consideration, we've decided to move forward with another candidate whose experience more closely aligns with the specific needs of this role. We were genuinely impressed by your skills and would love to keep you in mind for future opportunities. Please don't hesitate to apply again — we'd welcome the chance to work together.\n\nWishing you the best in your search."
+    tags: ["hr", "communication", "empathy"]
+  - id: "mj-8"
+    input: "Explain the concept of eventual consistency in distributed systems with a real-world analogy."
+    expected_output: "Eventual consistency means that if no new updates are made, all copies of the data will eventually converge to the same value, but they might be temporarily out of sync. Think of it like updating your phone number with friends — when you text your new number to your group chat, some friends see it immediately, others read it hours later, and one friend who had their phone off might not see it until the next day. For a while, different friends have different information about your number, but eventually everyone has the correct, updated number. In distributed databases, this trade-off allows for faster writes and higher availability at the cost of briefly stale reads."
+    tags: ["distributed-systems", "analogy", "teaching"]
+  - id: "mj-9"
+    input: "List three security best practices for handling API keys in a production application."
+    expected_output: "First, never hardcode API keys in source code or commit them to version control — use environment variables or a secrets manager like AWS Secrets Manager or HashiCorp Vault. Second, implement key rotation on a regular schedule and ensure your application can handle key transitions gracefully without downtime. Third, apply the principle of least privilege by scoping each API key to only the permissions it needs, and use separate keys for different environments (development, staging, production) to limit blast radius if a key is compromised."
+    tags: ["security", "best-practices", "devops"]
+  - id: "mj-10"
+    input: "Rewrite this technical sentence for a non-technical audience: 'The garbage collector reclaims heap-allocated memory that is no longer referenced by any live objects in the application.'"
+    expected_output: "When your app creates data it needs temporarily, that data takes up space in the computer's memory. Once the app is done with that data and no longer uses it, an automatic cleanup process finds it and frees up the space so it can be used for other things. This happens in the background without you having to do anything."
+    tags: ["simplification", "rewriting", "communication"]
