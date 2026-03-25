@@ -104,14 +104,20 @@ func (p *WaveSpeedProvider) Generate(ctx context.Context, req *models.GenerateRe
 	}
 
 	contentType := "video/mp4"
+	var costUSD float64
 	if req.Modality == models.ModalityImage {
 		contentType = "image/png"
+		costUSD = CalculateImageCost(modelPath, 1)
+	} else {
+		dur := float64(getParamInt(req.Params, "duration", 5))
+		costUSD = CalculateVideoCost(modelPath, dur)
 	}
 
 	return &models.GenerateResponse{
 		Content:     content,
 		ContentType: contentType,
 		LatencyMs:   time.Since(start).Milliseconds(),
+		CostUSD:     costUSD,
 		ModelUsed:   modelPath,
 	}, nil
 }

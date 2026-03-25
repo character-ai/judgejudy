@@ -69,10 +69,14 @@ func (p *ElevenLabsProvider) Generate(ctx context.Context, req *models.GenerateR
 		return nil, &models.ProviderError{Provider: "elevenlabs", Message: "read response", Err: err}
 	}
 
+	// Estimate duration: ~150 words/min, ~5 chars/word
+	durationSec := float64(len(req.Prompt)) / (150.0 * 5.0 / 60.0)
+
 	return &models.GenerateResponse{
 		Content:     base64.StdEncoding.EncodeToString(data),
 		ContentType: "audio/mpeg",
 		LatencyMs:   time.Since(start).Milliseconds(),
+		CostUSD:     CalculateAudioCost(model, durationSec),
 		ModelUsed:   model,
 	}, nil
 }

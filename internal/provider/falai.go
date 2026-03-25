@@ -86,10 +86,12 @@ func (p *FalAIProvider) Generate(ctx context.Context, req *models.GenerateReques
 		return nil, &models.ProviderError{Provider: "falai", Message: "download video", Err: err}
 	}
 
+	dur := getParamFloat(req.Params, "duration", 5)
 	return &models.GenerateResponse{
 		Content:     content,
 		ContentType: "video/mp4",
 		LatencyMs:   time.Since(start).Milliseconds(),
+		CostUSD:     CalculateVideoCost(model, dur),
 		ModelUsed:   model,
 	}, nil
 }

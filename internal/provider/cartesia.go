@@ -70,10 +70,13 @@ func (p *CartesiaProvider) Generate(ctx context.Context, req *models.GenerateReq
 		return nil, &models.ProviderError{Provider: "cartesia", Message: "read response", Err: err}
 	}
 
+	durationSec := float64(len(req.Prompt)) / (150.0 * 5.0 / 60.0)
+
 	return &models.GenerateResponse{
 		Content:     base64.StdEncoding.EncodeToString(data),
 		ContentType: "audio/mpeg",
 		LatencyMs:   time.Since(start).Milliseconds(),
+		CostUSD:     CalculateAudioCost(model, durationSec),
 		ModelUsed:   model,
 	}, nil
 }
