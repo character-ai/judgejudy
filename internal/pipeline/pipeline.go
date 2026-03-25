@@ -384,6 +384,9 @@ func computeAggregate(results []models.TestResult, evals []evaluator.Evaluator) 
 		}
 		if denominator > 0 {
 			agg.TotalPassRate = float64(allPassed) / float64(denominator)
+		} else {
+			// No thresholds set — everything passes by default
+			agg.TotalPassRate = 1.0
 		}
 	}
 

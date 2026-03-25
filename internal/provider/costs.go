@@ -72,19 +72,26 @@ var modelCosts = map[string]ModelCost{
 }
 
 // GetModelCost returns the cost info for a model and whether it was found.
-// Handles exact matches first, then substring matches for model paths
+// Handles exact matches first, then longest substring match for model paths
 // (e.g. "/v3/bytedance/seedance-v1.5-pro/text-to-video" matches "seedance-v1.5").
 func GetModelCost(model string) (ModelCost, bool) {
 	// Exact match first
 	if cost, ok := modelCosts[model]; ok {
 		return cost, true
 	}
-	// Substring match for model paths
+	// Longest substring match for model paths (avoids "gemini-2.5-flash" matching before "gemini-2.5-flash-image")
 	lm := strings.ToLower(model)
+	bestName := ""
+	var bestCost ModelCost
 	for name, cost := range modelCosts {
-		if strings.Contains(lm, strings.ToLower(name)) {
-			return cost, true
+		ln := strings.ToLower(name)
+		if strings.Contains(lm, ln) && len(name) > len(bestName) {
+			bestName = name
+			bestCost = cost
 		}
+	}
+	if bestName != "" {
+		return bestCost, true
 	}
 	return ModelCost{}, false
 }
