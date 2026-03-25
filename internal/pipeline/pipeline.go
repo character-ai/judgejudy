@@ -2,10 +2,14 @@ package pipeline
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +31,7 @@ type Pipeline struct {
 	store      store.Store
 	cache      *store.Cache
 	logger     *slog.Logger
+	mediaDir   string // directory to write media files to (if set, frees base64 from memory)
 }
 
 // New creates a new Pipeline.
@@ -42,6 +47,13 @@ func New(cfg *config.EvalConfig, prov provider.Provider, evals []evaluator.Evalu
 		cache:      cache,
 		logger:     logger,
 	}
+}
+
+// SetMediaDir configures the pipeline to write media files to disk as they are
+// generated, freeing base64 content from memory immediately. The media dir path
+// is relative to the working directory.
+func (p *Pipeline) SetMediaDir(dir string) {
+	p.mediaDir = dir
 }
 
 // Run executes the full evaluation pipeline.
@@ -95,6 +107,11 @@ func (p *Pipeline) Run(ctx context.Context) (*models.Run, error) {
 					Input:      tc.Input,
 					Scores:     map[string]models.Score{},
 				}
+			}
+
+			// Write media to disk immediately to free memory
+			if p.mediaDir != "" {
+				p.flushMedia(result)
 			}
 
 			mu.Lock()
@@ -336,6 +353,56 @@ func computeAggregate(results []models.TestResult, evals []evaluator.Evaluator) 
 	}
 
 	return agg
+}
+
+// flushMedia writes media content from a test result to disk and replaces
+// the base64 content with a MediaPath, freeing memory.
+func (p *Pipeline) flushMedia(result *models.TestResult) {
+	ct := result.GeneratedOutput.ContentType
+	content := result.GeneratedOutput.Content
+	if content == "" || ct == "" {
+		return
+	}
+	if !strings.HasPrefix(ct, "audio") && !strings.HasPrefix(ct, "image") && !strings.HasPrefix(ct, "video") {
+		return
+	}
+
+	os.MkdirAll(p.mediaDir, 0755)
+
+	ext := extForMedia(ct)
+	filename := result.TestCaseID + ext
+	filePath := filepath.Join(p.mediaDir, filename)
+
+	data, err := base64.StdEncoding.DecodeString(content)
+	if err != nil {
+		return
+	}
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		return
+	}
+
+	relDir := filepath.Base(p.mediaDir)
+	result.GeneratedOutput.MediaPath = relDir + "/" + filename
+	result.GeneratedOutput.Content = "" // free memory
+}
+
+func extForMedia(ct string) string {
+	switch {
+	case strings.Contains(ct, "wav"):
+		return ".wav"
+	case strings.Contains(ct, "mp3"), strings.Contains(ct, "mpeg"):
+		return ".mp3"
+	case strings.Contains(ct, "mp4"):
+		return ".mp4"
+	case strings.Contains(ct, "png"):
+		return ".png"
+	case strings.Contains(ct, "jpeg"), strings.Contains(ct, "jpg"):
+		return ".jpg"
+	case strings.Contains(ct, "webp"):
+		return ".webp"
+	default:
+		return ".bin"
+	}
 }
 
 func mean(vals []float64) float64 {

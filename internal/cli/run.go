@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/character-ai/judgejudy/internal/config"
 	"github.com/character-ai/judgejudy/internal/evaluator"
@@ -82,6 +84,17 @@ func newRunCmd() *cobra.Command {
 
 			// Create and run pipeline
 			p := pipeline.New(cfg, prov, evals, sqliteStore, redisCache, logger)
+
+			// Set media dir so media files are written as they complete
+			outPath := reportPath
+			if outPath == "" {
+				outPath = cfg.Report.OutputPath
+			}
+			if outPath != "" {
+				base := strings.TrimSuffix(outPath, filepath.Ext(outPath))
+				p.SetMediaDir(base + "_media")
+			}
+
 			run, err := p.Run(cmd.Context())
 			if err != nil {
 				return err
@@ -137,7 +150,6 @@ func newRunCmd() *cobra.Command {
 			}
 
 			// Generate report only if explicitly requested via flag or config
-			outPath := reportPath
 			if outPath == "" {
 				outPath = cfg.Report.OutputPath
 			}

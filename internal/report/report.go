@@ -30,7 +30,8 @@ type ReportData struct {
 // writing the result to outputPath. Media content is extracted to a sibling
 // directory (<report_name>_media/) to keep the HTML file small.
 func GenerateReport(run *models.Run, comparison *models.Comparison, outputPath string) error {
-	// Extract media to files before building report data
+	// Extract any remaining media that wasn't flushed by the pipeline
+	// (e.g. when generating a report from a stored run)
 	if run != nil {
 		extractMedia(run, outputPath)
 	}
@@ -218,6 +219,9 @@ func extractMedia(run *models.Run, reportPath string) {
 	created := false
 	for i := range run.Results {
 		r := &run.Results[i]
+		if r.GeneratedOutput.MediaPath != "" {
+			continue // already flushed by pipeline
+		}
 		ct := r.GeneratedOutput.ContentType
 		if ct == "" || r.GeneratedOutput.Content == "" {
 			continue
