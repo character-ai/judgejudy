@@ -486,6 +486,16 @@ func (j *JudgeEvaluator) parsePointwiseResponse(content string) (judgeResponse, 
 	if err := json.Unmarshal([]byte(content), &resp); err != nil {
 		return resp, fmt.Errorf("invalid judge JSON: %w\nraw: %s", err, content)
 	}
+
+	// If overall is missing/zero but dimension scores exist, compute as mean
+	if resp.Overall == 0 && len(resp.Scores) > 0 {
+		var sum float64
+		for _, v := range resp.Scores {
+			sum += v
+		}
+		resp.Overall = sum / float64(len(resp.Scores))
+	}
+
 	return resp, nil
 }
 
