@@ -208,9 +208,20 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 	for _, ev := range p.evaluators {
 		ev := ev
 		eg.Go(func() error {
-			score, err := ev.Evaluate(ectx, tc, *genResp)
-			if err != nil {
-				p.logger.Error("evaluator failed", "evaluator", ev.Name(), "test_case", tc.ID, "error", err)
+			var score *models.Score
+			var lastErr error
+			for attempt := 0; attempt <= p.cfg.Pipeline.RetryAttempts; attempt++ {
+				score, lastErr = ev.Evaluate(ectx, tc, *genResp)
+				if lastErr == nil {
+					break
+				}
+				if attempt < p.cfg.Pipeline.RetryAttempts {
+					p.logger.Warn("retrying evaluator", "evaluator", ev.Name(), "test_case", tc.ID, "attempt", attempt+1, "error", lastErr)
+					time.Sleep(time.Duration(attempt+1) * time.Second)
+				}
+			}
+			if lastErr != nil {
+				p.logger.Error("evaluator failed", "evaluator", ev.Name(), "test_case", tc.ID, "error", lastErr)
 				return nil // Don't fail the whole test case for one evaluator
 			}
 			scoresMu.Lock()
@@ -223,9 +234,24 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 		return nil, fmt.Errorf("evaluators for test case %s: %w", tc.ID, err)
 	}
 
+	// Capture source media URLs for before/after display in reports
+	var sourceURLs []string
+	if imgs, ok := tc.Metadata["images"]; ok {
+		if arr, ok := imgs.([]any); ok {
+			for _, v := range arr {
+				if s, ok := v.(string); ok {
+					sourceURLs = append(sourceURLs, s)
+				}
+			}
+		} else if arr, ok := imgs.([]string); ok {
+			sourceURLs = arr
+		}
+	}
+
 	return &models.TestResult{
 		TestCaseID:      tc.ID,
 		Input:           tc.Input,
+		SourceMediaURLs: sourceURLs,
 		GeneratedOutput: *genResp,
 		Scores:          scores,
 	}, nil

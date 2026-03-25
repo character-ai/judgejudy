@@ -256,6 +256,21 @@ table.results tr.expanded-row td { background: #f9fafb; padding: 16px 24px; }
               <pre>{{$result.TestCaseID}}</pre>
               <h4>Prompt</h4>
               <pre>{{$result.Input}}</pre>
+              {{if $result.SourceMediaURLs}}
+              <h4>Before &amp; After</h4>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+                <div style="flex:1;min-width:200px">
+                  <div style="font-size:0.75rem;font-weight:600;color:#888;margin-bottom:4px">BEFORE</div>
+                  {{range $result.SourceMediaURLs}}<img src="{{.}}" alt="source" style="max-width:100%;border-radius:4px;border:2px solid #d1d5db"/>{{end}}
+                </div>
+                <div style="flex:1;min-width:200px">
+                  <div style="font-size:0.75rem;font-weight:600;color:#888;margin-bottom:4px">AFTER</div>
+                  {{if isMediaType $result.GeneratedOutput.ContentType "image"}}
+                  {{if $result.GeneratedOutput.MediaPath}}<img src="{{$result.GeneratedOutput.MediaPath}}" alt="output" style="max-width:100%;border-radius:4px;border:2px solid #3b82f6"/>{{else}}<img src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}" alt="output" style="max-width:100%;border-radius:4px;border:2px solid #3b82f6"/>{{end}}
+                  {{end}}
+                </div>
+              </div>
+              {{else}}
               <h4>Generated Output</h4>
               {{if isMediaType $result.GeneratedOutput.ContentType "image"}}
               {{if $result.GeneratedOutput.MediaPath}}<img src="{{$result.GeneratedOutput.MediaPath}}" alt="output image"/>{{else}}<img src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}" alt="output image"/>{{end}}
@@ -265,6 +280,7 @@ table.results tr.expanded-row td { background: #f9fafb; padding: 16px 24px; }
               {{if $result.GeneratedOutput.MediaPath}}<video controls src="{{$result.GeneratedOutput.MediaPath}}"></video>{{else}}<video controls src="data:{{$result.GeneratedOutput.ContentType}};base64,{{$result.GeneratedOutput.Content}}"></video>{{end}}
               {{else}}
               <pre>{{$result.GeneratedOutput.Content}}</pre>
+              {{end}}
               {{end}}
               <h4>Evaluator Scores</h4>
               {{range $.Run.EvaluatorNames}}

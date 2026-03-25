@@ -86,6 +86,7 @@ type Score struct {
 type TestResult struct {
 	TestCaseID      string           `json:"test_case_id"`
 	Input           string           `json:"input"`
+	SourceMediaURLs []string         `json:"source_media_urls,omitempty"` // original images/media for edit evaluations
 	GeneratedOutput GenerateResponse `json:"generated_output"`
 	Scores          map[string]Score `json:"scores"`
 }
