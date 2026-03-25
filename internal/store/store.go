@@ -14,6 +14,8 @@ type Store interface {
 	GetBaseline(ctx context.Context, datasetID string) (*models.Run, error)
 	SetBaseline(ctx context.Context, runID string) error
 	SaveComparison(ctx context.Context, comp *models.Comparison) error
+	SaveHumanEvaluations(ctx context.Context, evals []models.HumanEvaluation) error
+	GetHumanEvaluations(ctx context.Context, runID string) ([]models.HumanEvaluation, error)
 	Close() error
 }
 

@@ -75,6 +75,17 @@ func migrate(db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_runs_dataset ON runs(dataset_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_runs_baseline ON runs(is_baseline)`,
+		`CREATE TABLE IF NOT EXISTS human_evaluations (
+			run_id TEXT NOT NULL,
+			test_case_id TEXT NOT NULL,
+			evaluator_name TEXT NOT NULL,
+			human_score REAL NOT NULL,
+			human_reasoning TEXT,
+			scored_at TEXT NOT NULL,
+			PRIMARY KEY (run_id, test_case_id, evaluator_name),
+			FOREIGN KEY (run_id) REFERENCES runs(id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_human_evals_run ON human_evaluations(run_id)`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
@@ -326,4 +337,56 @@ func scanRunFull(row *sql.Row) (*models.Run, error) {
 	run.IsBaseline = isBaseline != 0
 
 	return &run, nil
+}
+
+func (s *SQLiteStore) SaveHumanEvaluations(ctx context.Context, evals []models.HumanEvaluation) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `INSERT OR REPLACE INTO human_evaluations
+		(run_id, test_case_id, evaluator_name, human_score, human_reasoning, scored_at)
+		VALUES (?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("prepare: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, e := range evals {
+		_, err := stmt.ExecContext(ctx, e.RunID, e.TestCaseID, e.EvaluatorName,
+			e.HumanScore, e.HumanReasoning, e.ScoredAt.Format(time.RFC3339))
+		if err != nil {
+			return fmt.Errorf("insert human eval %s/%s: %w", e.TestCaseID, e.EvaluatorName, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (s *SQLiteStore) GetHumanEvaluations(ctx context.Context, runID string) ([]models.HumanEvaluation, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT run_id, test_case_id, evaluator_name,
+		human_score, human_reasoning, scored_at FROM human_evaluations WHERE run_id = ?`, runID)
+	if err != nil {
+		return nil, fmt.Errorf("query human evals: %w", err)
+	}
+	defer rows.Close()
+
+	var evals []models.HumanEvaluation
+	for rows.Next() {
+		var e models.HumanEvaluation
+		var scoredAt string
+		var reasoning sql.NullString
+		if err := rows.Scan(&e.RunID, &e.TestCaseID, &e.EvaluatorName,
+			&e.HumanScore, &reasoning, &scoredAt); err != nil {
+			return nil, fmt.Errorf("scan: %w", err)
+		}
+		if reasoning.Valid {
+			e.HumanReasoning = reasoning.String
+		}
+		e.ScoredAt, _ = time.Parse(time.RFC3339, scoredAt)
+		evals = append(evals, e)
+	}
+	return evals, rows.Err()
 }

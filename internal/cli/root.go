@@ -63,6 +63,8 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(newCompareCmd())
 	rootCmd.AddCommand(newListCmd())
 	rootCmd.AddCommand(newReportCmd())
+	rootCmd.AddCommand(newHumanEvalCmd())
+	rootCmd.AddCommand(newCalibrateCmd())
 
 	return rootCmd
 }

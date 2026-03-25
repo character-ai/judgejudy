@@ -71,6 +71,21 @@ table.results tr.expanded-row td { background: #f9fafb; padding: 16px 24px; }
 .pass-badge { color: #16a34a; font-weight: 600; }
 .fail-badge { color: #dc2626; font-weight: 600; }
 
+/* Human Eval */
+.human-eval-panel { margin-top: 10px; padding: 12px; background: #fffbeb; border: 1px solid #fbbf24; border-radius: 6px; }
+.human-eval-panel h5 { font-size: 0.8rem; font-weight: 600; color: #92400e; margin-bottom: 8px; }
+.score-btns { display: flex; gap: 4px; margin-bottom: 8px; }
+.score-btn { width: 36px; height: 36px; border: 2px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; font-weight: 700; font-size: 0.9rem; color: #555; transition: all 0.15s; }
+.score-btn:hover { border-color: #3b82f6; color: #3b82f6; }
+.score-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+.human-reasoning-input { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.8rem; resize: vertical; min-height: 40px; font-family: inherit; }
+.human-save-btn { margin-top: 6px; padding: 4px 12px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+.human-save-btn:hover { background: #2563eb; }
+.scored-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; margin-left: 4px; }
+.export-btn { padding: 6px 16px; background: #7c3aed; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+.export-btn:hover { background: #6d28d9; }
+.human-eval-progress { font-size: 0.8rem; color: #666; margin-left: 12px; }
+
 /* Print */
 @media print {
   .container { max-width: 100%; padding: 0; }
@@ -94,6 +109,8 @@ table.results tr.expanded-row td { background: #f9fafb; padding: 16px 24px; }
       <span class="badge {{if ge .Run.Aggregate.TotalPassRate 0.5}}badge-pass{{else}}badge-fail{{end}}">
         {{if ge .Run.Aggregate.TotalPassRate 0.5}}PASSED{{else}}FAILED{{end}}
       </span>
+      <button class="export-btn" onclick="exportHumanEval()">Export Human Eval</button>
+      <span class="human-eval-progress" id="humanEvalProgress"></span>
       {{end}}
     </div>
     {{if .Run}}
@@ -267,6 +284,19 @@ table.results tr.expanded-row td { background: #f9fafb; padding: 16px 24px; }
                 {{end}}
               </div>
               {{end}}
+              <h4>Human Evaluation</h4>
+              <div class="human-eval-panel" data-tc="{{$result.TestCaseID}}" data-eval="human">
+                <h5>Your overall score for this output</h5>
+                <div class="score-btns">
+                  <button class="score-btn" data-score="1" onclick="clickScore(this)">1</button>
+                  <button class="score-btn" data-score="2" onclick="clickScore(this)">2</button>
+                  <button class="score-btn" data-score="3" onclick="clickScore(this)">3</button>
+                  <button class="score-btn" data-score="4" onclick="clickScore(this)">4</button>
+                  <button class="score-btn" data-score="5" onclick="clickScore(this)">5</button>
+                </div>
+                <textarea class="human-reasoning-input" placeholder="Why did you give this score? (optional)"></textarea>
+                <button class="human-save-btn" onclick="saveHumanScore(this)">Save</button>
+              </div>
             </div>
           </td>
         </tr>
@@ -279,6 +309,7 @@ table.results tr.expanded-row td { background: #f9fafb; padding: 16px 24px; }
 
 </div>
 
+{{if .Run}}<script>var RUN_ID = "{{.Run.ID}}";</script>{{end}}
 <script>
 function toggleRow(idx) {
   var el = document.getElementById('detail-' + idx);
@@ -309,6 +340,80 @@ function sortTable(colIdx, type) {
     tbody.appendChild(rowPairs[j][1]);
   }
 }
+
+/* Human Evaluation */
+function heKey(tc, ev) { return 'he|' + RUN_ID + '|' + tc + '|' + ev; }
+
+function clickScore(btn) {
+  btn.parentElement.querySelectorAll('.score-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+function saveHumanScore(btn) {
+  var panel = btn.closest('.human-eval-panel');
+  var tc = panel.dataset.tc;
+  var ev = panel.dataset.eval;
+  var activeBtn = panel.querySelector('.score-btn.active');
+  if (!activeBtn) { alert('Please select a score (1-5)'); return; }
+  var score = parseInt(activeBtn.dataset.score);
+  var reasoning = panel.querySelector('.human-reasoning-input').value;
+  var data = { score: score, reasoning: reasoning, scored_at: new Date().toISOString() };
+  localStorage.setItem(heKey(tc, ev), JSON.stringify(data));
+  panel.style.borderColor = '#16a34a';
+  panel.querySelector('h5').textContent = 'Saved! Your score for: ' + ev + ' = ' + score;
+  updateProgress();
+}
+
+function exportHumanEval() {
+  var evals = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (key.indexOf('he|' + RUN_ID + '|') !== 0) continue;
+    var parts = key.split('|');
+    if (parts.length < 4) continue;
+    var tc = parts[2];
+    var ev = parts[3];
+    try { var data = JSON.parse(localStorage.getItem(key)); } catch(e) { continue; }
+    evals.push({
+      run_id: RUN_ID, test_case_id: tc, evaluator_name: ev,
+      human_score: data.score, human_reasoning: data.reasoning || '', scored_at: data.scored_at
+    });
+  }
+  if (evals.length === 0) { alert('No human scores saved yet. Score some test cases first.'); return; }
+  var blob = new Blob([JSON.stringify({ run_id: RUN_ID, evaluations: evals }, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'human_eval_' + RUN_ID + '.json';
+  a.click();
+}
+
+function loadHumanScores() {
+  document.querySelectorAll('.human-eval-panel').forEach(function(panel) {
+    var tc = panel.dataset.tc;
+    var ev = panel.dataset.eval;
+    var saved = localStorage.getItem(heKey(tc, ev));
+    if (!saved) return;
+    var data = JSON.parse(saved);
+    panel.querySelectorAll('.score-btn').forEach(function(btn) {
+      if (parseInt(btn.dataset.score) === data.score) btn.classList.add('active');
+    });
+    if (data.reasoning) panel.querySelector('.human-reasoning-input').value = data.reasoning;
+    panel.style.borderColor = '#16a34a';
+  });
+  updateProgress();
+}
+
+function updateProgress() {
+  var total = document.querySelectorAll('.human-eval-panel').length;
+  var scored = 0;
+  document.querySelectorAll('.human-eval-panel').forEach(function(p) {
+    if (localStorage.getItem(heKey(p.dataset.tc, p.dataset.eval))) scored++;
+  });
+  var el = document.getElementById('humanEvalProgress');
+  if (el) el.textContent = scored + ' / ' + total + ' scored';
+}
+
+document.addEventListener('DOMContentLoaded', loadHumanScores);
 </script>
 </body>
 </html>

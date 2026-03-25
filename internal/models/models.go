@@ -140,6 +140,36 @@ type EvaluatorConfig struct {
 	Params     map[string]any    `json:"params,omitempty" yaml:"params,omitempty"`
 }
 
+// HumanEvaluation — a single human score for one test case + evaluator pair
+type HumanEvaluation struct {
+	RunID          string    `json:"run_id"`
+	TestCaseID     string    `json:"test_case_id"`
+	EvaluatorName  string    `json:"evaluator_name"`
+	HumanScore     float64   `json:"human_score"`
+	HumanReasoning string    `json:"human_reasoning,omitempty"`
+	ScoredAt       time.Time `json:"scored_at"`
+}
+
+// CalibrationResult — per-evaluator calibration statistics
+type CalibrationResult struct {
+	EvaluatorName       string  `json:"evaluator_name"`
+	SampleCount         int     `json:"sample_count"`
+	PearsonCorrelation  float64 `json:"pearson_correlation"`
+	SpearmanCorrelation float64 `json:"spearman_correlation"`
+	MeanBias            float64 `json:"mean_bias"`
+	AgreementRate       float64 `json:"agreement_rate"`
+}
+
+// CalibrationReport — full calibration output for a run
+type CalibrationReport struct {
+	RunID          string              `json:"run_id"`
+	Evaluators     []CalibrationResult `json:"evaluators"`
+	MostAligned    string              `json:"most_aligned"`
+	LeastAligned   string              `json:"least_aligned"`
+	OverallPearson float64             `json:"overall_pearson"`
+	GeneratedAt    time.Time           `json:"generated_at"`
+}
+
 // Comparison — result of comparing two runs
 type Comparison struct {
 	BaselineRunID  string                 `json:"baseline_run_id"`
