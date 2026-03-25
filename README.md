@@ -1,223 +1,238 @@
-# judgejudy
+# JudgeJudy
 
-Multimodal AI evaluation framework — judge text, image, audio, and video generation with any model.
+Multimodal AI evaluation framework. Judge text, image, audio, and video generation using AI judges, automated metrics, and human evaluation — with any model, any provider.
 
-## Features
+## Why JudgeJudy?
 
-- **Multi-provider**: OpenAI, Anthropic, Google Gemini, Replicate, Together AI, Ollama
-- **Multi-modality**: Evaluate text, image, audio, and video outputs
-- **AI-as-Judge**: Use any LLM as an evaluator with custom rubrics and scoring dimensions
-- **Automated Metrics**: BERTScore, ROUGE, BLEU, FID, LPIPS, CLIP Score, PESQ, STOI, and more via Python bridge
-- **Composite Scoring**: Weighted multi-evaluator consensus (e.g., 3 different judges)
-- **Pairwise Comparison**: Compare outputs head-to-head with bias mitigations
-- **HTML Reports**: Self-contained, professional reports with charts and expandable details
-- **Caching**: Redis-backed generation cache to avoid redundant API calls
-- **Storage**: SQLite for run history, baselines, and comparisons
+Evaluating AI-generated content is hard. Different modalities need different metrics. AI judges are fast but can be miscalibrated. Human evaluation is accurate but slow. JudgeJudy combines all three into a single pipeline:
 
-## Quick Start
+1. **Generate** outputs from any provider (OpenAI, Anthropic, Gemini, ElevenLabs, Cartesia, WaveSpeed, fal.ai, Replicate, Together, Ollama)
+2. **Evaluate** with AI judges (custom rubrics), automated metrics (BERTScore, CLIP, PESQ, etc.), and human scoring
+3. **Calibrate** AI judges against human feedback and get rubric improvement suggestions
+4. **Compare** runs over time with baseline tracking and regression detection
 
-### Install
+## Install
 
 ```bash
 # Build from source
+git clone https://github.com/character-ai/judgejudy.git
+cd judgejudy
 make build
 
 # Or install to $GOPATH/bin
 make install
-```
 
-### Set API Keys
-
-```bash
-# Copy the example env file and fill in your keys
-cp .env.example .env
-
-# Or export directly — only set keys for providers you use:
-export JUDGEJUDY_OPENAI_API_KEY="sk-..."
-export JUDGEJUDY_ANTHROPIC_API_KEY="sk-ant-..."
-export JUDGEJUDY_GOOGLE_API_KEY="..."
-export JUDGEJUDY_REPLICATE_API_KEY="r8_..."
-export JUDGEJUDY_TOGETHER_API_KEY="..."
-# Ollama: no key needed, uses JUDGEJUDY_OLLAMA_HOST (default http://localhost:11434)
-```
-
-### Install Python Dependencies (for automated metrics)
-
-```bash
+# Install Python dependencies (for automated metrics)
 pip install -r python/requirements.txt
 ```
 
-### Run an Evaluation
+## Quick Start
+
+### 1. Set API Keys
 
 ```bash
-# Run with an example config
-judgejudy run examples/text_eval.yaml --report ./report.html
+cp .env.example .env
+# Edit .env with your API keys — only set the providers you use
+```
 
-# Mark a run as baseline
-judgejudy run examples/text_eval.yaml --baseline
+### 2. Run an Evaluation
 
-# Compare against a previous run
-judgejudy run examples/text_eval.yaml --compare <run-id>
+```bash
+# Text generation quality
+judgejudy run examples/text_eval.yaml --report report.html
+
+# Image generation
+judgejudy run examples/image_eval.yaml --report report.html
+
+# Audio TTS quality
+judgejudy run examples/audio_eval.yaml --report report.html
+
+# Video generation with realism + audio checks
+judgejudy run examples/video_eval.yaml --report report.html
+```
+
+### 3. Score with Human Evaluation
+
+Open the HTML report in a browser. Each test case has interactive 1-5 scoring buttons. Your scores persist across page reloads. Click **Export Human Eval** to download a JSON file.
+
+### 4. Import and Calibrate
+
+```bash
+# Import human scores
+judgejudy human-eval import <run-id> human_eval_<run-id>.json
+
+# Calibrate AI judges against your scores + get rubric suggestions
+judgejudy calibrate <run-id>
+```
+
+The calibrate command computes correlation, bias, and agreement between AI and human scores, then uses Claude to suggest specific rubric improvements based on where they diverged.
+
+## Features
+
+### Generation Providers
+
+| Provider | Text | Image | Audio | Video |
+|----------|------|-------|-------|-------|
+| OpenAI | GPT-4o, GPT-4.1 | DALL-E 3, gpt-image-1 | TTS-1, TTS-1-HD | - |
+| Anthropic | Claude Opus/Sonnet/Haiku | - | - | - |
+| Google Gemini | Gemini 2.5 Pro/Flash | - | - | - |
+| ElevenLabs | - | - | Eleven v3, Multilingual v2 | - |
+| Cartesia | - | - | Sonic 2, Sonic 3 | - |
+| WaveSpeed | - | Seedream | - | Seedance, WAN, VEO3, Sora-2 |
+| fal.ai | - | - | - | Kling3 |
+| Replicate | - | Various | Various | Various |
+| Together AI | Llama, Mistral | Various | - | - |
+| Ollama | Local models | - | - | - |
+
+### Evaluator Types
+
+**AI Judge** — Use any LLM to score outputs against a custom rubric with named dimensions (accuracy, clarity, realism, etc.). Supports pointwise scoring and pairwise comparison with bias mitigation.
+
+**Automated Metrics** — Reference-based and reference-free metrics via Python:
+
+| Metric | Modality | Reference needed? | What it measures |
+|--------|----------|-------------------|-----------------|
+| `bertscore` | text | yes | Semantic similarity (contextual embeddings) |
+| `rouge` | text | yes | N-gram overlap recall |
+| `bleu` | text | yes | N-gram precision |
+| `clip_score` | image | no (uses prompt) | Image-text alignment |
+| `fid` | image | yes (directory) | Distribution-level quality |
+| `lpips` | image | yes | Perceptual similarity |
+| `ssim` | image | yes | Structural similarity |
+| `pesq` | audio | yes | Speech quality (ITU standard) |
+| `stoi` | audio | yes | Speech intelligibility |
+| `utmos` | audio | no | Neural MOS prediction |
+| `temporal_consistency` | video | no | Frame-to-frame SSIM |
+| `clip_temporal` | video | no | Semantic consistency across frames |
+
+**Composite** — Weighted combination of multiple evaluators for consensus scoring.
+
+**Human Evaluation** — Interactive scoring in HTML reports with export/import and calibration.
+
+### HTML Reports
+
+Reports are self-contained HTML files with:
+- Score distributions and summary cards per evaluator
+- What each evaluator tests (rubric, dimensions, metric description)
+- Per-test-case details with AI reasoning ("why this score")
+- Playable audio/video and inline images for media outputs
+- Sortable results table with prompt visibility
+- Interactive human scoring (1-5) with localStorage persistence
+
+### Calibration
+
+After collecting human scores, `judgejudy calibrate` computes per-evaluator:
+- **Pearson/Spearman correlation** — ranking alignment
+- **Mean bias** — systematic over/under-scoring
+- **Agreement rate** — fraction within threshold
+
+Then generates **rubric improvement suggestions** using Claude, analyzing the biggest AI-vs-human divergences with both sides' reasoning to produce specific, actionable rewording.
+
+## Config Reference
+
+Evaluations are defined in YAML:
+
+```yaml
+name: "My Evaluation"
+description: "What this eval tests"
+
+dataset:
+  inline:
+    id: "dataset-v1"
+    modality: text    # text, image, audio, video
+    test_cases:
+      - id: "tc-1"
+        input: "Your prompt here"
+        expected_output: "Reference output (optional)"
+
+generator:
+  provider: openai    # any supported provider
+  model: gpt-4o
+  params:
+    temperature: 0.7
+
+evaluators:
+  - name: "quality-judge"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    rubric: |
+      Evaluate on accuracy, clarity, and relevance.
+    dimensions: [accuracy, clarity, relevance]
+    scale: [1, 5]
+    threshold: 0.7    # optional pass/fail
+
+  - name: "bertscore"
+    type: metric
+    metric: bertscore
+
+pipeline:
+  concurrency: 3
+  timeout_seconds: 60
+
+report:
+  output_path: "./report.html"
+```
+
+See `examples/` for complete configs covering text, image, audio, video, and multi-judge consensus.
+
+## CLI Reference
+
+```
+judgejudy run <config.yaml>         Run an evaluation pipeline
+  -r, --report string               Output HTML report path
+  -b, --baseline                    Mark this run as baseline
+      --compare string              Compare against a run ID
+  -s, --sample int                  Sample N test cases
+  -c, --concurrency int             Override concurrency
+
+judgejudy compare <id1> <id2>       Compare two runs side by side
+  -r, --report string               Output HTML report path
+
+judgejudy list [runs|baselines]     List evaluation runs
+      --dataset string              Filter by dataset ID
+      --limit int                   Max results (default 20)
+
+judgejudy report <run-id>           Generate report for a completed run
+  -o, --output string               Output path
+
+judgejudy human-eval import <run-id> <file.json>
+                                    Import human scores from exported JSON
+
+judgejudy calibrate <run-id>        Calibrate AI judges against human scores
+  -o, --output string               Write calibration JSON to file
+      --threshold float             Agreement threshold (default 0.1)
+
+Global flags:
+      --db string                   SQLite path (default ~/.judgejudy/judgejudy.db)
+      --redis string                Redis address (empty to disable)
+  -v, --verbose                     Debug logging
 ```
 
 ## Architecture
 
 ```
-┌──────────┐     ┌───────────────┐     ┌─────────────┐
-│  Config   │────▶│   Pipeline    │────▶│   Report    │
-│  (YAML)   │     │ (Orchestrator)│     │   (HTML)    │
-└──────────┘     └───────┬───────┘     └─────────────┘
-                         │
-              ┌──────────┼──────────┐
-              ▼          ▼          ▼
-        ┌──────────┐ ┌──────────┐ ┌──────────┐
-        │ Provider │ │Evaluator │ │  Store   │
-        │(Generate)│ │ (Score)  │ │(SQLite+  │
-        └──────────┘ └──────────┘ │ Redis)   │
-              │          │        └──────────┘
-    ┌─────────┼────┐   ┌─┴────┐
-    ▼    ▼    ▼    ▼   ▼      ▼
-  OpenAI Anthr Gem  ...  AI    Python
-              opi  ini   Judge  Metrics
-              c
+Config (YAML) ──> Pipeline ──> Report (HTML)
+                     │
+          ┌──────────┼──────────┐
+          v          v          v
+      Providers   Evaluators   Store
+      (Generate)  (Score)      (SQLite + Redis)
+          │          │
+   ┌──────┼────┐   ┌─┴──────────┐
+   v      v    v   v     v       v
+ OpenAI  ...  WS  AI   Python  Human
+              fal Judge Metrics  Eval
 ```
 
-## Config Reference
+## Contributing
 
-Create a YAML config file to define your evaluation:
+Contributions welcome. Please open an issue first to discuss what you'd like to change.
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `name` | string | yes | — | Evaluation name |
-| `description` | string | no | — | Description |
-| `dataset.path` | string | one of path/inline | — | Path to dataset YAML/JSON file |
-| `dataset.inline` | object | one of path/inline | — | Inline dataset definition |
-| `dataset.sample` | int | no | 0 (all) | Random sample N test cases |
-| `generator.provider` | string | yes | — | Provider name |
-| `generator.model` | string | yes | — | Model name |
-| `generator.params` | map | no | — | Model parameters (temperature, etc.) |
-| `evaluators[]` | array | yes | — | List of evaluator configs |
-| `pipeline.concurrency` | int | no | 5 | Max parallel test cases |
-| `pipeline.timeout_seconds` | int | no | 120 | Per-test-case timeout |
-| `pipeline.retry_attempts` | int | no | 2 | Retry count on failure |
-| `pipeline.cache_enabled` | bool | no | true | Enable Redis caching |
-| `pipeline.fail_fast` | bool | no | false | Stop on first error |
-| `report.output_path` | string | no | ./report.html | HTML report output path |
-| `report.title` | string | no | — | Report title |
+To add a new provider, create a file in `internal/provider/` implementing the `Provider` interface and register it in `init()`. See existing providers for examples.
 
-### Evaluator Types
+To add a new metric, add a function in the appropriate `python/metrics/*_metrics.py` file and register it in the `METRICS` dict.
 
-**AI Judge** (`type: ai_judge`):
+## License
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `provider` | string | yes | Judge model provider |
-| `model` | string | yes | Judge model name |
-| `mode` | string | no | `pointwise` (default) or `pairwise` |
-| `rubric` | string | yes | Evaluation rubric/instructions |
-| `dimensions` | []string | no | Scoring dimensions |
-| `scale` | [int, int] | no | Score range (default [1, 5]) |
-| `threshold` | float | no | Pass/fail threshold (0.0-1.0) |
-
-**Metric** (`type: metric`):
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `metric` | string | yes | Metric name (see table below) |
-| `params` | map | no | Metric-specific parameters |
-
-**Composite** (`type: composite`):
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `children` | []evaluator | yes | Child evaluators |
-| `threshold` | float | no | Pass/fail threshold for weighted average |
-
-## Supported Providers
-
-| Provider | Text | Image Gen | Audio Gen | Video Gen | Vision Judge | Audio Judge |
-|----------|------|-----------|-----------|-----------|-------------|-------------|
-| OpenAI | yes | yes (DALL-E) | yes (TTS) | — | yes (GPT-4o) | — |
-| Anthropic | yes | — | — | — | yes (Claude) | — |
-| Google Gemini | yes | — | — | — | yes | yes (native) |
-| Replicate | — | yes | yes | yes | — | — |
-| Together AI | yes | yes | — | — | — | — |
-| Ollama | yes | — | — | — | yes (llava) | — |
-
-## Supported Metrics
-
-| Metric | Modality | Library | Description |
-|--------|----------|---------|-------------|
-| `bertscore` | text | bert-score | Semantic similarity (F1) |
-| `rouge` | text | rouge-score | ROUGE-L F1 |
-| `bleu` | text | nltk | BLEU score |
-| `fid` | image | clean-fid | Frechet Inception Distance |
-| `lpips` | image | lpips | Learned Perceptual Image Patch Similarity |
-| `clip_score` | image | transformers | CLIP cosine similarity |
-| `ssim` | image | torchmetrics | Structural Similarity Index |
-| `pesq` | audio | pesq | Perceptual Evaluation of Speech Quality |
-| `stoi` | audio | pystoi | Short-Time Objective Intelligibility |
-| `temporal_consistency` | video | opencv | Frame-to-frame SSIM |
-| `clip_temporal` | video | transformers | Temporal CLIP embedding consistency |
-
-## CLI Reference
-
-### `judgejudy run <config.yaml>`
-
-Run an evaluation pipeline.
-
-```
-Flags:
-  -r, --report string     Output path for HTML report
-  -b, --baseline          Mark this run as baseline
-      --compare string    Run ID to compare against
-  -s, --sample int        Override dataset sample size
-  -c, --concurrency int   Override concurrency
-```
-
-### `judgejudy compare <run-id-1> <run-id-2>`
-
-Compare two evaluation runs side by side.
-
-```
-Flags:
-  -r, --report string     Output path for HTML report
-```
-
-### `judgejudy report <run-id>`
-
-Generate an HTML report for a completed run.
-
-```
-Flags:
-  -o, --output string     Output path (default: report_<run-id>.html)
-      --compare string    Include comparison data against another run
-```
-
-### `judgejudy list [runs|baselines]`
-
-List evaluation runs.
-
-```
-Flags:
-      --dataset string    Filter by dataset ID
-      --limit int         Maximum results (default 20)
-```
-
-### Global Flags
-
-```
-      --db string         SQLite database path (default ~/.judgejudy/judgejudy.db)
-      --redis string      Redis address (e.g. localhost:6379, empty to disable)
-  -v, --verbose           Enable debug logging
-```
-
-## Examples
-
-See the `examples/` directory for complete evaluation configs:
-
-- `text_eval.yaml` — Text generation with Claude as judge + BERTScore
-- `image_eval.yaml` — DALL-E 3 image gen with GPT-4o vision judge + CLIP score
-- `audio_eval.yaml` — TTS evaluation with Gemini audio judge + PESQ
-- `video_eval.yaml` — Video generation with frame analysis + temporal metrics
-- `multi_judge.yaml` — Multi-judge consensus with composite scoring
+[MIT](LICENSE)
