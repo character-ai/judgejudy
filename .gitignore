@@ -1,9 +1,8 @@
 .env
 .idea
 JUDGEJUDY-SPEC.md
-audio_eval_report.html
-image_eval_report.html
-judgejudy
+*_report.html
 report.html
-multi_judge_report.html
-video_eval_report.html
+human_eval_*.json
+judgejudy
+build/
