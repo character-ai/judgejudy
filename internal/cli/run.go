@@ -150,9 +150,6 @@ func newRunCmd() *cobra.Command {
 			}
 
 			// Generate report only if explicitly requested via flag or config
-			if outPath == "" {
-				outPath = cfg.Report.OutputPath
-			}
 			if outPath != "" {
 				if err := report.GenerateReport(run, comp, outPath); err != nil {
 					return fmt.Errorf("generating report: %w", err)

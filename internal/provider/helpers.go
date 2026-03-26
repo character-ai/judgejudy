@@ -14,6 +14,9 @@ import (
 	"github.com/character-ai/judgejudy/internal/models"
 )
 
+// maxResponseBytes is the maximum size of an HTTP response body we will read (500 MB).
+const maxResponseBytes = 500 * 1024 * 1024
+
 // Shared HTTP client for downloading media URLs.
 var downloadClient = &http.Client{Timeout: 60 * time.Second}
 
@@ -29,11 +32,11 @@ func downloadAndEncode(ctx context.Context, url string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		return "", fmt.Errorf("HTTP %d fetching URL", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return "", err
 	}
@@ -46,7 +49,7 @@ func httpError(provider string, resp *http.Response) *models.ProviderError {
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return nil
 	}
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 	return &models.ProviderError{
 		Provider:  provider,
 		Message:   fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(body)),
@@ -88,7 +91,7 @@ func doJSON(ctx context.Context, client *http.Client, method, url string, header
 	if result != nil {
 		defer resp.Body.Close()
 		if resp.StatusCode >= 400 {
-			body, _ := io.ReadAll(resp.Body)
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 			return resp, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 		}
 		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
@@ -121,7 +124,7 @@ func pollForCompletion(ctx context.Context, client *http.Client, headers map[str
 			continue // retry transient errors
 		}
 
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024)) // 1MB limit for poll responses
 		resp.Body.Close()
 
 		done, err := checkStatus(body)

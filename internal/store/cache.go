@@ -37,8 +37,9 @@ func NewCache(addr string) (*Cache, error) {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
+		client.Close()
 		log.Printf("WARNING: Redis unavailable at %s: %v — cache disabled", addr, err)
-		c := &Cache{client: client, ttl: 7 * 24 * time.Hour}
+		c := &Cache{ttl: 7 * 24 * time.Hour}
 		c.disabled.Store(true)
 		return c, nil
 	}

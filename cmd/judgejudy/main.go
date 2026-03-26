@@ -8,7 +8,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var version = "0.1.0"
+var version = "dev"
 
 func main() {
 	// Load .env file if present (does not override existing env vars).

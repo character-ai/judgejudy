@@ -82,10 +82,11 @@ func (p *OpenAIProvider) generateText(ctx context.Context, req *models.GenerateR
 			},
 		}
 		for _, ref := range req.ReferenceInputs {
+			mimeType := detectMIMEType(ref)
 			parts = append(parts, openai.ChatMessagePart{
 				Type: openai.ChatMessagePartTypeImageURL,
 				ImageURL: &openai.ChatMessageImageURL{
-					URL:    "data:image/png;base64," + ref,
+					URL:    "data:" + mimeType + ";base64," + ref,
 					Detail: openai.ImageURLDetailAuto,
 				},
 			})
@@ -229,7 +230,7 @@ func (p *OpenAIProvider) generateAudio(ctx context.Context, req *models.Generate
 	}
 	defer resp.Close()
 
-	data, err := io.ReadAll(resp)
+	data, err := io.ReadAll(io.LimitReader(resp, maxResponseBytes))
 	if err != nil {
 		return nil, &models.ProviderError{
 			Provider: "openai",

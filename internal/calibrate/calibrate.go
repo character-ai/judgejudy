@@ -98,10 +98,14 @@ func Calibrate(run *models.Run, humanEvals []models.HumanEvaluation, agreementTh
 	if len(results) > 0 {
 		best, worst := results[0], results[0]
 		for _, r := range results {
-			if r.PearsonCorrelation > best.PearsonCorrelation {
+			// Skip NaN correlations (undefined: no variance in scores)
+			if math.IsNaN(r.PearsonCorrelation) {
+				continue
+			}
+			if math.IsNaN(best.PearsonCorrelation) || r.PearsonCorrelation > best.PearsonCorrelation {
 				best = r
 			}
-			if r.PearsonCorrelation < worst.PearsonCorrelation {
+			if math.IsNaN(worst.PearsonCorrelation) || r.PearsonCorrelation < worst.PearsonCorrelation {
 				worst = r
 			}
 		}
@@ -341,8 +345,9 @@ func BuildRubricSuggestionPrompt(run *models.Run, humanEvals []models.HumanEvalu
 }
 
 func truncate(s string, n int) string {
-	if len(s) <= n {
+	runes := []rune(s)
+	if len(runes) <= n {
 		return s
 	}
-	return s[:n] + "..."
+	return string(runes[:n]) + "..."
 }

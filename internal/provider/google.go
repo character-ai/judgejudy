@@ -40,9 +40,13 @@ func NewGoogleProvider(apiKey string) (*GoogleProvider, error) {
 func (p *GoogleProvider) Name() string { return "google" }
 
 func (p *GoogleProvider) SupportsModality(m models.Modality) bool {
-	// Google Gemini can accept image/audio inputs (vision, audio understanding)
-	// but SupportsModality means "can generate this modality", which is only text.
-	return m == models.ModalityText
+	switch m {
+	case models.ModalityText, models.ModalityImage, models.ModalityAudio:
+		// Text generation, plus image/audio inputs (vision, audio understanding)
+		return true
+	default:
+		return false
+	}
 }
 
 func (p *GoogleProvider) Generate(ctx context.Context, req *models.GenerateRequest) (*models.GenerateResponse, error) {

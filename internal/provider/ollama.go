@@ -146,14 +146,14 @@ func (p *OllamaProvider) generateChat(ctx context.Context, req *models.GenerateR
 		return nil, &models.ProviderError{
 			Provider:  "ollama",
 			Message:   "request failed",
-			Retryable: true,
+			Retryable: isTransientError(err),
 			Err:       err,
 		}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 		return nil, &models.ProviderError{
 			Provider:   "ollama",
 			StatusCode: resp.StatusCode,

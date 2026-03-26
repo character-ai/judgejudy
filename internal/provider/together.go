@@ -273,7 +273,7 @@ func (p *TogetherProvider) doRequestWithRetry(ctx context.Context, method, url s
 			}
 		}
 
-		respBody, err := io.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 		resp.Body.Close()
 		if err != nil {
 			return nil, &models.ProviderError{

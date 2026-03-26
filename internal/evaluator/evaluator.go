@@ -3,7 +3,6 @@ package evaluator
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/character-ai/judgejudy/internal/models"
 )
@@ -23,38 +22,6 @@ type Evaluator interface {
 	Type() models.EvalType
 	// Evaluate scores a single test case against the generated output.
 	Evaluate(ctx context.Context, input models.TestCase, output models.GenerateResponse) (*models.Score, error)
-}
-
-// registry holds all registered evaluator constructors.
-var (
-	registryMu   sync.RWMutex
-	registry     = make(map[string]Evaluator)
-)
-
-// Register adds an evaluator instance to the global registry.
-func Register(e Evaluator) {
-	registryMu.Lock()
-	defer registryMu.Unlock()
-	registry[e.Name()] = e
-}
-
-// Get retrieves an evaluator by name from the global registry.
-func Get(name string) (Evaluator, bool) {
-	registryMu.RLock()
-	defer registryMu.RUnlock()
-	e, ok := registry[name]
-	return e, ok
-}
-
-// List returns the names of all registered evaluators.
-func List() []string {
-	registryMu.RLock()
-	defer registryMu.RUnlock()
-	names := make([]string, 0, len(registry))
-	for name := range registry {
-		names = append(names, name)
-	}
-	return names
 }
 
 // NewEvaluator constructs an Evaluator from config. The resolver is used to

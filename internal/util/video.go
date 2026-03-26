@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 // ExtractFrames extracts evenly-spaced frames from a video file using ffmpeg.
@@ -15,17 +17,29 @@ func ExtractFrames(videoPath string, numFrames int) ([]string, error) {
 		numFrames = 8
 	}
 
+	// Get total frame count via ffprobe
+	totalFrames, err := probeFrameCount(videoPath)
+	if err != nil || totalFrames <= 0 {
+		// Fallback: extract at a fixed interval
+		totalFrames = numFrames * numFrames
+	}
+
+	interval := totalFrames / numFrames
+	if interval < 1 {
+		interval = 1
+	}
+
 	tmpDir, err := os.MkdirTemp("", "jj_frames_*")
 	if err != nil {
 		return nil, fmt.Errorf("creating temp dir: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Use ffmpeg to extract frames
+	// Use ffmpeg to extract evenly-spaced frames
 	outPattern := filepath.Join(tmpDir, "frame_%04d.png")
 	cmd := exec.Command("ffmpeg",
 		"-i", videoPath,
-		"-vf", fmt.Sprintf("select=not(mod(n\\,%d)),setpts=N/TB", numFrames),
+		"-vf", fmt.Sprintf("select=not(mod(n\\,%d)),setpts=N/TB", interval),
 		"-frames:v", fmt.Sprintf("%d", numFrames),
 		"-vsync", "vfr",
 		outPattern,
@@ -50,4 +64,21 @@ func ExtractFrames(videoPath string, numFrames int) ([]string, error) {
 	}
 
 	return frames, nil
+}
+
+// probeFrameCount uses ffprobe to get the total number of video frames.
+func probeFrameCount(videoPath string) (int, error) {
+	cmd := exec.Command("ffprobe",
+		"-v", "error",
+		"-select_streams", "v:0",
+		"-count_frames",
+		"-show_entries", "stream=nb_read_frames",
+		"-of", "csv=p=0",
+		videoPath,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(out)))
 }

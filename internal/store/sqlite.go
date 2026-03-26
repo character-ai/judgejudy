@@ -172,10 +172,10 @@ func (s *SQLiteStore) ListRuns(ctx context.Context, opts ListOpts) ([]models.Run
 	if opts.Limit > 0 {
 		query += " LIMIT ?"
 		args = append(args, opts.Limit)
-	}
-	if opts.Offset > 0 {
-		query += " OFFSET ?"
-		args = append(args, opts.Offset)
+		if opts.Offset > 0 {
+			query += " OFFSET ?"
+			args = append(args, opts.Offset)
+		}
 	}
 
 	rows, err := s.db.QueryContext(ctx, query, args...)

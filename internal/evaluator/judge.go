@@ -5,13 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
-
 	"github.com/character-ai/judgejudy/internal/models"
 )
 
@@ -33,7 +31,11 @@ func resolveVideoPath(output models.GenerateResponse) string {
 	if err != nil {
 		return ""
 	}
-	f.Write(data)
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return ""
+	}
 	f.Close()
 	return f.Name()
 }
@@ -124,14 +126,13 @@ type JudgeEvaluator struct {
 	threshold  *float64
 	params     map[string]any
 	provider   ProviderFunc
-	rng        *rand.Rand
 }
 
 // judgeResponse is the expected JSON structure returned by the judge model
 // for pointwise evaluation.
 type judgeResponse struct {
 	Scores    map[string]float64 `json:"scores"`
-	Overall   float64            `json:"overall"`
+	Overall   *float64           `json:"overall,omitempty"`
 	Reasoning string             `json:"reasoning"`
 }
 
@@ -166,7 +167,6 @@ func NewJudgeEvaluator(cfg models.EvaluatorConfig, provider ProviderFunc) (*Judg
 		threshold:  cfg.Threshold,
 		params:     cfg.Params,
 		provider:   provider,
-		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 	}, nil
 }
 
@@ -196,6 +196,16 @@ func (j *JudgeEvaluator) evaluatePointwise(ctx context.Context, input models.Tes
 	// Accumulate per-dimension scores across rounds for averaging.
 	dimTotals := make(map[string]float64)
 
+	// Resolve video path once outside the loop to avoid repeated temp file creation
+	// and defer-in-loop issues.
+	var videoPath string
+	if strings.HasPrefix(output.ContentType, "video") && (output.Content != "" || output.MediaPath != "") {
+		videoPath = resolveVideoPath(output)
+		if videoPath != "" && output.MediaPath == "" {
+			defer os.Remove(videoPath)
+		}
+	}
+
 	for round := 0; round < numRounds; round++ {
 		prompt := j.buildPointwisePrompt(input, output)
 
@@ -215,13 +225,7 @@ func (j *JudgeEvaluator) evaluatePointwise(ctx context.Context, input models.Tes
 			req.Params["audio_mime_type"] = output.ContentType
 		} else if strings.HasPrefix(output.ContentType, "image") && output.Content != "" {
 			req.ReferenceInputs = []string{output.Content}
-		} else if strings.HasPrefix(output.ContentType, "video") && (output.Content != "" || output.MediaPath != "") {
-			// Resolve video to a file path for ffmpeg
-			videoPath := resolveVideoPath(output)
-			// Clean up temp file if we created one (not MediaPath)
-			if videoPath != "" && output.MediaPath == "" {
-				defer os.Remove(videoPath)
-			}
+		} else if videoPath != "" {
 
 			wantsAudio := strings.Contains(strings.ToLower(j.name), "audio") ||
 				strings.Contains(strings.ToLower(j.name), "stt")
@@ -258,7 +262,7 @@ func (j *JudgeEvaluator) evaluatePointwise(ctx context.Context, input models.Tes
 			return nil, fmt.Errorf("judge %q: parse response (round %d): %w", j.name, round+1, err)
 		}
 
-		totalScore += parsed.Overall
+		totalScore += *parsed.Overall
 		for dim, val := range parsed.Scores {
 			dimTotals[dim] += val
 		}
@@ -304,7 +308,7 @@ func (j *JudgeEvaluator) evaluatePairwise(ctx context.Context, input models.Test
 		outputB := input.ExpectedOutput
 		swapped := false
 
-		if randomizeOrder && j.rng.Intn(2) == 1 {
+		if randomizeOrder && rand.IntN(2) == 1 {
 			outputA, outputB = outputB, outputA
 			swapped = true
 		}
@@ -487,13 +491,19 @@ func (j *JudgeEvaluator) parsePointwiseResponse(content string) (judgeResponse, 
 		return resp, fmt.Errorf("invalid judge JSON: %w\nraw: %s", err, content)
 	}
 
-	// If overall is missing/zero but dimension scores exist, compute as mean
-	if resp.Overall == 0 && len(resp.Scores) > 0 {
+	// If overall was not explicitly provided but dimension scores exist, compute as mean.
+	if resp.Overall == nil && len(resp.Scores) > 0 {
 		var sum float64
 		for _, v := range resp.Scores {
 			sum += v
 		}
-		resp.Overall = sum / float64(len(resp.Scores))
+		avg := sum / float64(len(resp.Scores))
+		resp.Overall = &avg
+	}
+	// Default to 0 if still nil
+	if resp.Overall == nil {
+		zero := 0.0
+		resp.Overall = &zero
 	}
 
 	return resp, nil

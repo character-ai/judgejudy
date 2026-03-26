@@ -64,7 +64,12 @@ func (p *FalAIProvider) Generate(ctx context.Context, req *models.GenerateReques
 	err = pollForCompletion(ctx, p.httpClient, headers, queueResp.StatusURL, 5*time.Second, maxAttempts,
 		func(body []byte) (bool, error) {
 			var s struct{ Status string `json:"status"` }
-			json.Unmarshal(body, &s)
+			if err := json.Unmarshal(body, &s); err != nil {
+				return false, fmt.Errorf("parse poll response: %w", err)
+			}
+			if s.Status == "FAILED" {
+				return false, fmt.Errorf("fal.ai job failed")
+			}
 			return s.Status == "COMPLETED", nil
 		},
 	)

@@ -28,7 +28,7 @@ func newReportCmd() *cobra.Command {
 			}
 
 			if outputPath == "" {
-				outputPath = fmt.Sprintf("report_%s.html", runID[:8])
+				outputPath = fmt.Sprintf("report_%s.html", shortID(runID))
 			}
 
 			var comp *models.Comparison
@@ -37,29 +37,7 @@ func newReportCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("loading comparison run: %w", err)
 				}
-				comp = &models.Comparison{
-					BaselineRunID:  runID,
-					CandidateRunID: compareID,
-					Deltas:         make(map[string]models.MetricDelta),
-				}
-				for evalName, baselineMean := range run.Aggregate.MeanScores {
-					candidateMean, ok := compRun.Aggregate.MeanScores[evalName]
-					if !ok {
-						continue
-					}
-					delta := candidateMean - baselineMean
-					var pctDelta float64
-					if baselineMean != 0 {
-						pctDelta = (delta / baselineMean) * 100
-					}
-					comp.Deltas[evalName] = models.MetricDelta{
-						BaselineMean:  baselineMean,
-						CandidateMean: candidateMean,
-						AbsoluteDelta: delta,
-						PercentDelta:  pctDelta,
-						Improved:      delta > 0,
-					}
-				}
+				comp = buildComparison(compareID, runID, compRun.Aggregate.MeanScores, run.Aggregate.MeanScores)
 			}
 
 			if err := report.GenerateReport(run, comp, outputPath); err != nil {

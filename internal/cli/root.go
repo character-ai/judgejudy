@@ -41,7 +41,13 @@ func NewRootCmd() *cobra.Command {
 
 			// Initialize cache — default is empty (disabled).
 			// Only connect to Redis if explicitly configured.
-			redisCache, _ = store.NewCache(redisAddr)
+			if redisAddr != "" {
+				var cacheErr error
+				redisCache, cacheErr = store.NewCache(redisAddr)
+				if cacheErr != nil {
+					logger.Warn("failed to connect to Redis cache", "addr", redisAddr, "error", cacheErr)
+				}
+			}
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {

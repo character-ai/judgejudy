@@ -30,35 +30,7 @@ func newCompareCmd() *cobra.Command {
 				return fmt.Errorf("loading candidate: %w", err)
 			}
 
-			comp := &models.Comparison{
-				BaselineRunID:  baselineID,
-				CandidateRunID: candidateID,
-				Deltas:         make(map[string]models.MetricDelta),
-			}
-
-			for evalName, baselineMean := range baseline.Aggregate.MeanScores {
-				candidateMean, ok := candidate.Aggregate.MeanScores[evalName]
-				if !ok {
-					continue
-				}
-				delta := candidateMean - baselineMean
-				var pctDelta float64
-				if baselineMean != 0 {
-					pctDelta = (delta / baselineMean) * 100
-				}
-				comp.Deltas[evalName] = models.MetricDelta{
-					BaselineMean:  baselineMean,
-					CandidateMean: candidateMean,
-					AbsoluteDelta: delta,
-					PercentDelta:  pctDelta,
-					Improved:      delta > 0,
-				}
-				if pctDelta < -5.0 {
-					comp.Regressions = append(comp.Regressions, evalName)
-				} else if pctDelta > 5.0 {
-					comp.Improvements = append(comp.Improvements, evalName)
-				}
-			}
+			comp := buildComparison(baselineID, candidateID, baseline.Aggregate.MeanScores, candidate.Aggregate.MeanScores)
 
 			if err := sqliteStore.SaveComparison(ctx, comp); err != nil {
 				return fmt.Errorf("saving comparison: %w", err)
@@ -94,4 +66,37 @@ func newCompareCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&reportPath, "report", "r", "", "Output path for HTML report")
 	return cmd
+}
+
+// buildComparison computes deltas between baseline and candidate mean scores.
+func buildComparison(baselineID, candidateID string, baselineScores, candidateScores map[string]float64) *models.Comparison {
+	comp := &models.Comparison{
+		BaselineRunID:  baselineID,
+		CandidateRunID: candidateID,
+		Deltas:         make(map[string]models.MetricDelta),
+	}
+	for evalName, baselineMean := range baselineScores {
+		candidateMean, ok := candidateScores[evalName]
+		if !ok {
+			continue
+		}
+		delta := candidateMean - baselineMean
+		var pctDelta float64
+		if baselineMean != 0 {
+			pctDelta = (delta / baselineMean) * 100
+		}
+		comp.Deltas[evalName] = models.MetricDelta{
+			BaselineMean:  baselineMean,
+			CandidateMean: candidateMean,
+			AbsoluteDelta: delta,
+			PercentDelta:  pctDelta,
+			Improved:      delta > 0,
+		}
+		if pctDelta < -5.0 {
+			comp.Regressions = append(comp.Regressions, evalName)
+		} else if pctDelta > 5.0 {
+			comp.Improvements = append(comp.Improvements, evalName)
+		}
+	}
+	return comp
 }

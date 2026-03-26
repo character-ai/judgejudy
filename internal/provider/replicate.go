@@ -64,11 +64,12 @@ func (p *ReplicateProvider) generateSync(ctx context.Context, req *models.Genera
 	input := replicate.PredictionInput{
 		"prompt": req.Prompt,
 	}
-	// Merge additional params
+	// Merge additional params (skip framework-level keys)
 	for k, v := range req.Params {
-		if k != "model" {
-			input[k] = v
+		if k == "model" || k == "version" || k == "max_poll_attempts" {
+			continue
 		}
+		input[k] = v
 	}
 
 	start := time.Now()
@@ -123,9 +124,10 @@ func (p *ReplicateProvider) generateAsync(ctx context.Context, req *models.Gener
 		"prompt": req.Prompt,
 	}
 	for k, v := range req.Params {
-		if k != "model" && k != "version" {
-			input[k] = v
+		if k == "model" || k == "version" || k == "max_poll_attempts" {
+			continue
 		}
+		input[k] = v
 	}
 
 	start := time.Now()

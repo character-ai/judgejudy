@@ -25,7 +25,7 @@ func newCalibrateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			runID := args[0]
-			ctx := context.Background()
+			ctx := cmd.Context()
 
 			run, err := sqliteStore.GetRun(ctx, runID)
 			if err != nil {
@@ -94,8 +94,11 @@ func newCalibrateCmd() *cobra.Command {
 					"calibration": report,
 					"suggestions": suggestions,
 				}
-				data, _ := json.MarshalIndent(out, "", "  ")
-				if err := os.WriteFile(outputPath, data, 0644); err != nil {
+				data, err := json.MarshalIndent(out, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshaling calibration report: %w", err)
+				}
+				if err := os.WriteFile(outputPath, data, 0600); err != nil {
 					return fmt.Errorf("writing output: %w", err)
 				}
 				fmt.Printf("\nCalibration report written to %s\n", outputPath)

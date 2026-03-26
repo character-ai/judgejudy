@@ -203,14 +203,15 @@ table.results tr.expanded-row td { background: #f9fafb; padding: 16px 24px; }
           <td>{{$name}}</td>
           <td>{{formatFloat $delta.BaselineMean 4}}</td>
           <td>{{formatFloat $delta.CandidateMean 4}}</td>
-          <td class="{{if $delta.Improved}}delta-positive{{else}}delta-negative{{end}}">
+          {{$status := deltaStatus $delta.PercentDelta}}
+          <td class="{{if eq $status "improved"}}delta-positive{{else if eq $status "regressed"}}delta-negative{{else}}delta-stable{{end}}">
             {{if $delta.Improved}}+{{end}}{{formatFloat $delta.AbsoluteDelta 4}}
           </td>
-          <td class="{{if $delta.Improved}}delta-positive{{else}}delta-negative{{end}}">
+          <td class="{{if eq $status "improved"}}delta-positive{{else if eq $status "regressed"}}delta-negative{{else}}delta-stable{{end}}">
             {{if $delta.Improved}}+{{end}}{{formatFloat $delta.PercentDelta 1}}%
           </td>
           <td>
-            {{if $delta.Improved}}<span class="pass-badge">Improved</span>{{else}}<span class="fail-badge">Regressed</span>{{end}}
+            {{if eq $status "improved"}}<span class="pass-badge">Improved</span>{{else if eq $status "regressed"}}<span class="fail-badge">Regressed</span>{{else}}<span style="color:#888">Stable</span>{{end}}
           </td>
         </tr>
         {{end}}

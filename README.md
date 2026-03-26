@@ -253,11 +253,7 @@ Config (YAML) ──> Pipeline ──> Report (HTML)
 
 ## Contributing
 
-Contributions welcome. Please open an issue first to discuss what you'd like to change.
-
-To add a new provider, create a file in `internal/provider/` implementing the `Provider` interface and register it in `init()`. See existing providers for examples.
-
-To add a new metric, add a function in the appropriate `python/metrics/*_metrics.py` file and register it in the `METRICS` dict.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, guidelines, and how to add new providers or metrics.
 
 ## License
 

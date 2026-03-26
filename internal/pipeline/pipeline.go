@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -164,7 +165,7 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 	var genResp *models.GenerateResponse
 	var cacheKey string
 	if p.cache != nil && p.cfg.Pipeline.CacheEnabled {
-		cacheKey = store.GenerateKey(p.cfg.Generator.Provider, p.cfg.Generator.Model, tc.Input, p.cfg.Generator.Params)
+		cacheKey = store.GenerateKey(p.cfg.Generator.Provider, p.cfg.Generator.Model, tc.Input, params)
 		cached, err := p.cache.Get(ctx, cacheKey)
 		if err == nil && cached != nil {
 			p.logger.Debug("cache hit", "test_case", tc.ID)
@@ -180,12 +181,17 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 			if err == nil {
 				break
 			}
-			if pe, ok := err.(*models.ProviderError); ok && !pe.Retryable {
+			var pe *models.ProviderError
+		if errors.As(err, &pe) && !pe.Retryable {
 				return nil, err
 			}
 			if attempt < p.cfg.Pipeline.RetryAttempts {
 				p.logger.Warn("retrying generation", "test_case", tc.ID, "attempt", attempt+1, "error", err)
-				time.Sleep(time.Duration(attempt+1) * time.Second)
+				select {
+				case <-time.After(time.Duration(attempt+1) * time.Second):
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
 			}
 		}
 		if err != nil {
@@ -217,7 +223,11 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 				}
 				if attempt < p.cfg.Pipeline.RetryAttempts {
 					p.logger.Warn("retrying evaluator", "evaluator", ev.Name(), "test_case", tc.ID, "attempt", attempt+1, "error", lastErr)
-					time.Sleep(time.Duration(attempt+1) * time.Second)
+					select {
+					case <-time.After(time.Duration(attempt+1) * time.Second):
+					case <-ectx.Done():
+						return ectx.Err()
+					}
 				}
 			}
 			if lastErr != nil {
@@ -405,10 +415,14 @@ func (p *Pipeline) flushMedia(result *models.TestResult) {
 		return
 	}
 
-	os.MkdirAll(p.mediaDir, 0755)
+	if err := os.MkdirAll(p.mediaDir, 0755); err != nil {
+		p.logger.Warn("failed to create media dir", "error", err)
+		return
+	}
 
 	ext := extForMedia(ct)
-	filename := result.TestCaseID + ext
+	// Sanitize TestCaseID to prevent path traversal
+	filename := filepath.Base(result.TestCaseID) + ext
 	filePath := filepath.Join(p.mediaDir, filename)
 
 	data, err := base64.StdEncoding.DecodeString(content)
@@ -428,9 +442,9 @@ func extForMedia(ct string) string {
 	switch {
 	case strings.Contains(ct, "wav"):
 		return ".wav"
-	case strings.Contains(ct, "mp3"), strings.Contains(ct, "mpeg"):
+	case strings.Contains(ct, "mp3"), strings.Contains(ct, "audio/mpeg"):
 		return ".mp3"
-	case strings.Contains(ct, "mp4"):
+	case strings.Contains(ct, "mp4"), strings.Contains(ct, "video/mpeg"):
 		return ".mp4"
 	case strings.Contains(ct, "png"):
 		return ".png"

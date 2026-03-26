@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/character-ai/judgejudy/internal/models"
@@ -51,10 +52,10 @@ func (p *ElevenLabsProvider) Generate(ctx context.Context, req *models.GenerateR
 		"Accept":     "audio/mpeg",
 	}
 
-	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s", voiceID)
+	apiURL := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s", url.PathEscape(voiceID))
 
 	start := time.Now()
-	resp, err := doJSON(ctx, p.httpClient, "POST", url, headers, payload, nil)
+	resp, err := doJSON(ctx, p.httpClient, "POST", apiURL, headers, payload, nil)
 	if err != nil {
 		return nil, &models.ProviderError{Provider: "elevenlabs", Message: "request failed", Retryable: isTransientError(err), Err: err}
 	}

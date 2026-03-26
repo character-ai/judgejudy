@@ -69,7 +69,11 @@ func (m *MetricsEvaluator) Evaluate(ctx context.Context, input models.TestCase, 
 		if tmpErr == nil {
 			data, decErr := base64.StdEncoding.DecodeString(output.Content)
 			if decErr == nil {
-				tmpFile.Write(data)
+				if _, wErr := tmpFile.Write(data); wErr != nil {
+					tmpFile.Close()
+					os.Remove(tmpFile.Name())
+					return nil, fmt.Errorf("metric %q: write temp media: %w", m.name, wErr)
+				}
 				tmpFile.Close()
 				filePath = tmpFile.Name()
 				defer os.Remove(filePath)
@@ -181,9 +185,9 @@ func extForContentType(ct string) string {
 	switch {
 	case strings.Contains(ct, "wav"):
 		return ".wav"
-	case strings.Contains(ct, "mp3"), strings.Contains(ct, "mpeg"):
+	case strings.Contains(ct, "mp3"), strings.Contains(ct, "audio/mpeg"):
 		return ".mp3"
-	case strings.Contains(ct, "mp4"):
+	case strings.Contains(ct, "mp4"), strings.Contains(ct, "video/mpeg"):
 		return ".mp4"
 	case strings.Contains(ct, "png"):
 		return ".png"

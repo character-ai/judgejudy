@@ -48,7 +48,7 @@ func (c *EvalConfig) Defaults() {
 	if c.Pipeline.TimeoutSeconds <= 0 {
 		c.Pipeline.TimeoutSeconds = 120
 	}
-	if c.Pipeline.RetryAttempts <= 0 {
+	if c.Pipeline.RetryAttempts < 0 {
 		c.Pipeline.RetryAttempts = 2
 	}
 	// Note: Report.OutputPath intentionally not defaulted —

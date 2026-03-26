@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -32,7 +31,7 @@ func newHumanEvalImportCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			runID := args[0]
-			ctx := context.Background()
+			ctx := cmd.Context()
 
 			run, err := sqliteStore.GetRun(ctx, runID)
 			if err != nil {

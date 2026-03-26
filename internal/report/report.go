@@ -54,6 +54,7 @@ func GenerateReport(run *models.Run, comparison *models.Comparison, outputPath s
 		"derefBool":    derefBool,
 		"metricDesc":   metricDesc,
 		"evalConfig":   evalConfigLookup(run),
+		"deltaStatus":  deltaStatus,
 	}
 
 	tmpl, err := template.New("report").Funcs(funcMap).Parse(reportTemplate)
@@ -231,12 +232,15 @@ func extractMedia(run *models.Run, reportPath string) {
 		}
 
 		if !created {
-			os.MkdirAll(mediaDir, 0755)
+			if err := os.MkdirAll(mediaDir, 0755); err != nil {
+				return // cannot write media files
+			}
 			created = true
 		}
 
 		ext := extForMedia(ct)
-		filename := fmt.Sprintf("%s%s", r.TestCaseID, ext)
+		// Sanitize TestCaseID to prevent path traversal
+		filename := fmt.Sprintf("%s%s", filepath.Base(r.TestCaseID), ext)
 		filePath := filepath.Join(mediaDir, filename)
 
 		data, err := base64.StdEncoding.DecodeString(r.GeneratedOutput.Content)
@@ -310,6 +314,18 @@ var metricDescriptions = map[string]string{
 	"utmos":                "UTMOS Mean Opinion Score — neural prediction of human-perceived speech quality, no reference needed (normalized to 0-1, higher is better)",
 	"temporal_consistency": "Frame-to-frame SSIM across consecutive video frames — measures visual stability over time (0-1, higher is better)",
 	"clip_temporal":        "CLIP embedding similarity between consecutive video frames — measures semantic consistency over time (0-1, higher is better)",
+}
+
+// deltaStatus returns "improved", "regressed", or "stable" based on the percent delta,
+// matching the CLI's +/- 5% threshold logic.
+func deltaStatus(pctDelta float64) string {
+	if pctDelta > 5 {
+		return "improved"
+	}
+	if pctDelta < -5 {
+		return "regressed"
+	}
+	return "stable"
 }
 
 func metricDesc(name string) string {
