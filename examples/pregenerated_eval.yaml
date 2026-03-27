@@ -1,0 +1,121 @@
+name: "Pre-Generated Content A/B Eval"
+description: "Compare two pre-generated outputs using pairwise and pointwise judges"
+
+dataset:
+  inline:
+    id: "pregenerated-v1"
+    name: "Pre-Generated A/B Comparison"
+    version: "1.0.0"
+    modality: text
+    test_cases:
+      - id: "tc-1"
+        input: "Write a concise explanation of how HTTPS works for a junior developer."
+        expected_output: |
+          HTTPS adds a security layer to HTTP using TLS. When you visit a site,
+          your browser and the server do a TLS handshake: the server sends its
+          certificate, they agree on encryption, and then all data is encrypted.
+          This prevents eavesdropping and tampering.
+        metadata:
+          generated_output: |
+            HTTPS is HTTP with encryption. Your browser checks the server's SSL
+            certificate, they negotiate a shared secret using asymmetric crypto,
+            then switch to fast symmetric encryption for the actual data. The
+            certificate proves you're talking to the real server, not an impostor.
+            Without HTTPS, anyone on the same Wi-Fi could read your passwords
+            in plain text.
+        tags: ["security", "explanation"]
+
+      - id: "tc-2"
+        input: "Explain the difference between a stack and a queue using a real-world analogy."
+        expected_output: |
+          A stack is like a stack of plates: you add and remove from the top
+          (last in, first out). A queue is like a line at the store: first person
+          in line gets served first (first in, first out).
+        metadata:
+          generated_output: |
+            Think of a stack as a Pringles can — you can only grab the chip on
+            top, and the last chip you pushed in comes out first. A queue is like
+            the drive-through at a fast food place — the first car to enter is the
+            first car to get their food. Stacks are LIFO (Last In, First Out),
+            queues are FIFO (First In, First Out). In code, you'd use a stack for
+            undo history and a queue for processing jobs in order.
+        tags: ["data-structures", "analogy"]
+
+      - id: "tc-3"
+        input: "Write a brief incident summary for a Redis cache failure that caused 10 minutes of elevated latency."
+        expected_output: |
+          At 09:15 UTC, Redis primary experienced an OOM event causing cache
+          evictions and read failures. API latency increased 5x as requests
+          fell through to the database. Resolved at 09:25 UTC by restarting
+          Redis with increased maxmemory. Adding memory alerts and circuit
+          breakers to prevent recurrence.
+        metadata:
+          generated_output: |
+            Summary: 10-minute latency spike from Redis OOM.
+
+            Timeline:
+            - 09:14 UTC — Redis memory hit limit, evictions started
+            - 09:15 UTC — Cache miss rate spiked to 80%, DB load tripled
+            - 09:17 UTC — PagerDuty alert fired on p99 latency > 2s
+            - 09:22 UTC — Oncall identified Redis OOM via Grafana
+            - 09:25 UTC — Redis restarted with 2x memory, latency normalized
+
+            Root cause: Unmonitored memory growth from new feature caching
+            large JSON blobs. Action items: add memory usage alerts, set
+            per-key TTLs, add circuit breaker for cache failures.
+        tags: ["incident-response", "devops"]
+
+# Passthrough provider returns metadata.generated_output as the "generated" content.
+# No API calls are made — both outputs are pre-generated.
+generator:
+  provider: passthrough
+  model: passthrough
+
+evaluators:
+  # Pairwise blind comparison: which output is better?
+  # Score: 1.0 = candidate (metadata.generated_output) wins
+  #        0.5 = tie
+  #        0.0 = reference (expected_output) wins
+  - name: "pairwise-quality"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pairwise
+    rubric: |
+      Compare both outputs for clarity, accuracy, and usefulness.
+      Which response would be more helpful to the target audience
+      described in the input? Consider depth, structure, and tone.
+    dimensions:
+      - overall_quality
+    scale: [1, 10]
+    params:
+      num_rounds: 3
+      randomize_order: true
+
+  # Pointwise scoring of the candidate output independently
+  - name: "pointwise-quality"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Evaluate the response for:
+      - Accuracy: Is the information correct?
+      - Clarity: Is it easy to understand for the target audience?
+      - Completeness: Does it cover the key points?
+      - Conciseness: Is it appropriately brief without losing substance?
+    dimensions:
+      - accuracy
+      - clarity
+      - completeness
+      - conciseness
+    scale: [1, 5]
+    threshold: 0.7
+
+pipeline:
+  concurrency: 3
+  timeout_seconds: 60
+
+report:
+  output_path: "./pregenerated_eval_report.html"
+  title: "Pre-Generated Content A/B Evaluation"

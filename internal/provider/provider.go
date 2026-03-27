@@ -45,9 +45,15 @@ func Get(name string) (Constructor, bool) {
 	return ctor, ok
 }
 
+// noAPIKeyRequired lists providers that do not need an API key.
+var noAPIKeyRequired = map[string]bool{
+	"ollama":      true,
+	"passthrough": true,
+}
+
 // NewProvider creates a provider by name. If apiKey is empty, it reads from
 // the environment variable JUDGEJUDY_{PROVIDER}_API_KEY.
-// For ollama, no API key is needed; the host is read from JUDGEJUDY_OLLAMA_HOST.
+// Providers listed in noAPIKeyRequired skip the API key check.
 func NewProvider(name, apiKey string) (Provider, error) {
 	registryMu.RLock()
 	ctor, ok := constructors[name]
@@ -59,7 +65,7 @@ func NewProvider(name, apiKey string) (Provider, error) {
 		}
 	}
 
-	if apiKey == "" && name != "ollama" {
+	if apiKey == "" && !noAPIKeyRequired[name] {
 		envKey := "JUDGEJUDY_" + strings.ToUpper(name) + "_API_KEY"
 		apiKey = os.Getenv(envKey)
 		if apiKey == "" {

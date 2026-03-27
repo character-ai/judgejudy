@@ -17,7 +17,8 @@ var knownProviders = map[string]bool{
 	"elevenlabs": true,
 	"cartesia":   true,
 	"falai":      true,
-	"wavespeed":  true,
+	"wavespeed":    true,
+	"passthrough": true,
 }
 
 // ValidationErrors collects multiple validation errors

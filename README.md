@@ -6,7 +6,7 @@ Multimodal AI evaluation framework. Judge text, image, audio, and video generati
 
 Evaluating AI-generated content is hard. Different modalities need different metrics. AI judges are fast but can be miscalibrated. Human evaluation is accurate but slow. JudgeJudy combines all three into a single pipeline:
 
-1. **Generate** outputs from any provider (OpenAI, Anthropic, Gemini, ElevenLabs, Cartesia, WaveSpeed, fal.ai, Replicate, Together, Ollama)
+1. **Generate** outputs from any provider (OpenAI, Anthropic, Gemini, ElevenLabs, Cartesia, WaveSpeed, fal.ai, Replicate, Together, Ollama) — or evaluate pre-generated content
 2. **Evaluate** with AI judges (custom rubrics), automated metrics (BERTScore, CLIP, PESQ, etc.), and human scoring
 3. **Calibrate** AI judges against human feedback and get rubric improvement suggestions
 4. **Compare** runs over time with baseline tracking and regression detection
@@ -67,6 +67,53 @@ judgejudy calibrate <run-id>
 
 The calibrate command computes correlation, bias, and agreement between AI and human scores, then uses Claude to suggest specific rubric improvements based on where they diverged.
 
+## Evaluating Pre-Generated Content
+
+Use the `passthrough` provider to evaluate content generated outside JudgeJudy — for example, A/B testing two different generation systems or comparing model versions.
+
+The passthrough provider reads from `metadata.generated_output` in each test case instead of calling an API. Pair it with pairwise judges for blind A/B comparison:
+
+```yaml
+dataset:
+  inline:
+    id: "my-ab-test"
+    modality: text
+    test_cases:
+      - id: "tc-1"
+        input: "The prompt or context for this test case"
+        expected_output: |
+          Baseline output (system A / current version)
+        metadata:
+          generated_output: |
+            Candidate output (system B / new version)
+
+generator:
+  provider: passthrough
+  model: passthrough
+
+evaluators:
+  - name: "pairwise-quality"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pairwise
+    rubric: |
+      Compare both outputs for quality. Which is better?
+    dimensions: [overall_quality]
+    scale: [1, 10]
+    params:
+      num_rounds: 3          # multiple rounds for consistency
+      randomize_order: true   # blind: randomize A/B position
+```
+
+How it works:
+- `metadata.generated_output` → fed through the passthrough provider as the candidate output
+- `expected_output` → used as the reference in pairwise comparison
+- `input` → shown to judges as context (the original prompt/scenario)
+- Pairwise scores: **1.0** = candidate wins, **0.5** = tie, **0.0** = baseline wins
+
+No API keys are needed for the passthrough provider. See `examples/pregenerated_eval.yaml` for a complete example.
+
 ## Features
 
 ### Generation Providers
@@ -83,6 +130,7 @@ The calibrate command computes correlation, bias, and agreement between AI and h
 | Replicate | - | Various | Various | Various |
 | Together AI | Llama, Mistral | Various | - | - |
 | Ollama | Local models | - | - | - |
+| Passthrough | Pre-generated content | Pre-generated content | Pre-generated content | Pre-generated content |
 
 ### Evaluator Types
 
@@ -200,7 +248,7 @@ When pointing to a GCS directory, each file is processed as follows:
 
 GCS auth uses standard Google Application Default Credentials (`gcloud auth application-default login` or `GOOGLE_APPLICATION_CREDENTIALS`).
 
-See `examples/` for complete configs covering text, image, audio, video, and multi-judge consensus.
+See `examples/` for complete configs covering text, image, audio, video, multi-judge consensus, and pre-generated content A/B evaluation.
 
 ## CLI Reference
 
