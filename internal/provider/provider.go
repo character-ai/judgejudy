@@ -59,7 +59,7 @@ func NewProvider(name, apiKey string) (Provider, error) {
 		}
 	}
 
-	if apiKey == "" && name != "ollama" {
+	if apiKey == "" && name != "ollama" && name != "passthrough" {
 		envKey := "JUDGEJUDY_" + strings.ToUpper(name) + "_API_KEY"
 		apiKey = os.Getenv(envKey)
 		if apiKey == "" {
