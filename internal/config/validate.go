@@ -18,7 +18,7 @@ var knownProviders = map[string]bool{
 	"cartesia":   true,
 	"falai":      true,
 	"wavespeed":    true,
-	"passthrough":  true,
+	"passthrough": true,
 }
 
 // ValidationErrors collects multiple validation errors
