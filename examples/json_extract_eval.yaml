@@ -1,0 +1,92 @@
+name: "JSON Extraction Post-Processing Eval"
+description: |
+  Example eval demonstrating the json_extract post-processing feature.
+
+  When a model outputs JSON wrapped in markdown code fences or mixed with
+  prose, the json_extract param strips everything except the JSON content.
+
+  Set json_extract to:
+  - "[]" to extract a JSON array (finds first [ and last ])
+  - "{}" to extract a JSON object (finds first { and last })
+
+  This is applied after generation and before evaluation, so judges
+  evaluate clean JSON rather than raw model output with formatting noise.
+
+dataset:
+  inline:
+    id: json-extract-v1
+    name: JSON Extraction Test
+    version: "1.0.0"
+    modality: text
+    test_cases:
+      - id: extract-array
+        input: |
+          List the 5 largest countries by area as a JSON array.
+          Each object should have: name, area_km2, continent.
+        tags: [json, geography]
+
+      - id: extract-nested
+        input: |
+          Create a JSON object representing a movie with:
+          title, year, director, cast (array of names),
+          and ratings (object with imdb, rotten_tomatoes scores).
+          Use the movie "Inception" (2010).
+        tags: [json, movies]
+
+generator:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  params:
+    max_tokens: 2048
+    json_extract: "[]"  # Extract JSON array from output
+
+evaluators:
+  - name: "json-validity"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Check if the output is valid, parseable JSON.
+
+      Scoring:
+      - Valid JSON with correct structure: 10/10
+      - Valid JSON but missing fields: 7/10
+      - Almost valid JSON (minor syntax error): 4/10
+      - Not JSON at all (prose, markdown, etc.): 0/10
+
+      IMPORTANT: Respond with ONLY the JSON object. Put analysis in "reasoning".
+    dimensions:
+      - json_validity
+      - structure_completeness
+    scale: [0, 10]
+    threshold: 0.7
+
+  - name: "content-accuracy"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Evaluate the factual accuracy and completeness of the JSON content.
+
+      Check:
+      - Are the values factually correct?
+      - Are all requested fields present?
+      - Are data types appropriate (numbers as numbers, not strings)?
+    dimensions:
+      - factual_accuracy
+      - field_completeness
+      - type_correctness
+    scale: [1, 10]
+    threshold: 0.6
+
+pipeline:
+  concurrency: 2
+  timeout_seconds: 120
+  retry_attempts: 2
+  cache_enabled: true
+
+report:
+  output_path: "./json_extract_eval_report.html"
+  title: "JSON Extraction Post-Processing Evaluation"

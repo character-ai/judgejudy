@@ -121,7 +121,7 @@ No API keys are needed for the passthrough provider. See `examples/pregenerated_
 | Provider | Text | Image | Audio | Video |
 |----------|------|-------|-------|-------|
 | OpenAI | GPT-4o, GPT-4.1 | DALL-E 3, gpt-image-1 | TTS-1, TTS-1-HD | - |
-| Anthropic | Claude Opus/Sonnet/Haiku | - | - | - |
+| Anthropic | Claude Opus/Sonnet/Haiku (streaming, tool_use) | - | - | - |
 | Google Gemini | Gemini 2.5 Pro/Flash | - | - | - |
 | ElevenLabs | - | - | Eleven v3, Multilingual v2 | - |
 | Cartesia | - | - | Sonic 2, Sonic 3 | - |
@@ -198,6 +198,10 @@ generator:
   model: gpt-4o
   params:
     temperature: 0.7
+    # Tool use — force structured JSON output via tool calls (Anthropic)
+    tools: '[{"name":"submit_result","description":"Submit structured output","input_schema":{"type":"object","properties":{"data":{"type":"string"}},"required":["data"]}}]'
+    # JSON extraction — extract JSON from raw output before evaluation
+    json_extract: "[]"  # "[]" for arrays, "{}" for objects
 
 evaluators:
   - name: "quality-judge"
@@ -221,6 +225,38 @@ pipeline:
 report:
   output_path: "./report.html"
 ```
+
+### Structured Output with Tool Use
+
+When models ignore JSON format instructions and produce prose, use `tools` to force structured output via tool calls:
+
+```yaml
+generator:
+  provider: anthropic
+  model: claude-opus-4-5
+  params:
+    max_tokens: 32768
+    tools: '[{"name":"submit_data","description":"Submit the result","input_schema":{"type":"object","properties":{"items":{"type":"array","items":{"type":"string"}}},"required":["items"]}}]'
+```
+
+The provider sends the tool definition to the API and extracts the tool call input as the evaluation content. This guarantees valid JSON matching the schema. See `examples/tool_use_eval.yaml`.
+
+### JSON Extraction
+
+When models output JSON wrapped in markdown code fences or mixed with prose, `json_extract` strips everything except the JSON:
+
+```yaml
+generator:
+  params:
+    json_extract: "[]"  # Extract array: finds first [ and last ]
+    # json_extract: "{}"  # Extract object: finds first { and last }
+```
+
+Applied after generation and before evaluation. See `examples/json_extract_eval.yaml`.
+
+### Streaming for Large Outputs
+
+The Anthropic provider automatically uses streaming for requests with `max_tokens > 16384`. This is required for Claude Opus with large outputs — the API returns an error without it. No configuration needed; it activates automatically. See `examples/streaming_eval.yaml`.
 
 ### Dataset Sources
 

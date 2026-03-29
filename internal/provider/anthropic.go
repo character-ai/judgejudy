@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -72,29 +73,111 @@ func (p *AnthropicProvider) generateText(ctx context.Context, req *models.Genera
 		Temperature: param.NewOpt(temperature),
 	}
 
+	// Add tools if configured
+	var toolName string
+	if toolsJSON, ok := req.Params["tools"]; ok {
+		if toolsStr, ok := toolsJSON.(string); ok && toolsStr != "" {
+			var toolDefs []struct {
+				Name        string         `json:"name"`
+				Description string         `json:"description"`
+				InputSchema map[string]any `json:"input_schema"`
+			}
+			if err := json.Unmarshal([]byte(toolsStr), &toolDefs); err == nil {
+				for _, td := range toolDefs {
+					toolName = td.Name
+					params.Tools = append(params.Tools, anthropic.ToolUnionParam{
+						OfTool: &anthropic.ToolParam{
+							Name:        td.Name,
+							Description: anthropic.String(td.Description),
+							InputSchema: anthropic.ToolInputSchemaParam{
+								Properties: td.InputSchema["properties"],
+								ExtraFields: map[string]interface{}{
+									"required": td.InputSchema["required"],
+								},
+							},
+						},
+					})
+				}
+			}
+		}
+	}
+
+	// Use streaming for large max_tokens requests (required by Opus for long operations)
+	useStreaming := maxTokens > 16384
+
 	start := time.Now()
-	resp, err := p.client.Messages.New(ctx, params)
-	latency := time.Since(start).Milliseconds()
-
-	if err != nil {
-		return nil, &models.ProviderError{
-			Provider:  "anthropic",
-			Message:   "message creation failed",
-			Retryable: isTransientError(err),
-			Err:       err,
-		}
-	}
-
-	// Extract text content from response
 	var content string
-	for _, block := range resp.Content {
-		if tb, ok := block.AsAny().(anthropic.TextBlock); ok {
-			content += tb.Text
+	var inputTokens, outputTokens int
+	var modelUsed string
+
+	// Helper to extract content from message blocks (handles both text and tool_use)
+	extractContent := func(blocks []anthropic.ContentBlockUnion) string {
+		var result string
+		for _, block := range blocks {
+			switch v := block.AsAny().(type) {
+			case anthropic.ToolUseBlock:
+				if toolName != "" && v.Name == toolName {
+					result = string(v.Input)
+				}
+			case anthropic.TextBlock:
+				if toolName == "" { // Only use text if no tool expected
+					result += v.Text
+				}
+			}
 		}
+		return result
 	}
 
-	inputTokens := int(resp.Usage.InputTokens)
-	outputTokens := int(resp.Usage.OutputTokens)
+	if useStreaming {
+		stream := p.client.Messages.NewStreaming(ctx, params)
+		defer stream.Close()
+
+		var message anthropic.Message
+		for stream.Next() {
+			event := stream.Current()
+			if err := message.Accumulate(event); err != nil {
+				return nil, &models.ProviderError{
+					Provider:  "anthropic",
+					Message:   "streaming accumulate failed",
+					Retryable: false,
+					Err:       err,
+				}
+			}
+		}
+		if err := stream.Err(); err != nil {
+			return nil, &models.ProviderError{
+				Provider:  "anthropic",
+				Message:   "streaming message creation failed",
+				Retryable: isTransientError(err),
+				Err:       err,
+			}
+		}
+
+		content = extractContent(message.Content)
+		inputTokens = int(message.Usage.InputTokens)
+		outputTokens = int(message.Usage.OutputTokens)
+		modelUsed = string(message.Model)
+	} else {
+		resp, err := p.client.Messages.New(ctx, params)
+		if err != nil {
+			return nil, &models.ProviderError{
+				Provider:  "anthropic",
+				Message:   "message creation failed",
+				Retryable: isTransientError(err),
+				Err:       err,
+			}
+		}
+
+		content = extractContent(resp.Content)
+		inputTokens = int(resp.Usage.InputTokens)
+		outputTokens = int(resp.Usage.OutputTokens)
+		modelUsed = string(resp.Model)
+	}
+
+	latency := time.Since(start).Milliseconds()
+	if modelUsed == "" {
+		modelUsed = model
+	}
 
 	return &models.GenerateResponse{
 		Content:     content,
@@ -102,8 +185,8 @@ func (p *AnthropicProvider) generateText(ctx context.Context, req *models.Genera
 		LatencyMs:   latency,
 		CostUSD:     CalculateCost(model, inputTokens, outputTokens),
 		TokensUsed:  inputTokens + outputTokens,
-		ModelUsed:   model,
-		Raw:         resp,
+		ModelUsed:   modelUsed,
+		Raw:         nil,
 	}, nil
 }
 
