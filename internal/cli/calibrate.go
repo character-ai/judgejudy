@@ -7,9 +7,9 @@ import (
 	"math"
 	"os"
 
-	"github.com/character-ai/judgejudy/internal/calibrate"
-	"github.com/character-ai/judgejudy/internal/models"
-	"github.com/character-ai/judgejudy/internal/provider"
+	"github.com/character-ai/judgejudy/pkg/calibrate"
+	"github.com/character-ai/judgejudy/pkg/models"
+	"github.com/character-ai/judgejudy/pkg/provider"
 	"github.com/spf13/cobra"
 )
 

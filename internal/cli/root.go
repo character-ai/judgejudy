@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/character-ai/judgejudy/internal/store"
+	"github.com/character-ai/judgejudy/pkg/store"
 	"github.com/spf13/cobra"
 )
 

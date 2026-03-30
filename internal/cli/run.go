@@ -1,19 +1,19 @@
 package cli
 
 import (
-	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/character-ai/judgejudy/internal/config"
-	"github.com/character-ai/judgejudy/internal/evaluator"
-	"github.com/character-ai/judgejudy/internal/models"
-	"github.com/character-ai/judgejudy/internal/pipeline"
-	"github.com/character-ai/judgejudy/internal/provider"
-	"github.com/character-ai/judgejudy/internal/report"
+	"github.com/character-ai/judgejudy/pkg/config"
+	"github.com/character-ai/judgejudy/pkg/evaluator"
+	"github.com/character-ai/judgejudy/pkg/models"
+	"github.com/character-ai/judgejudy/pkg/pipeline"
+	"github.com/character-ai/judgejudy/pkg/provider"
+	"github.com/character-ai/judgejudy/pkg/report"
 	"github.com/spf13/cobra"
 )
 
@@ -22,11 +22,12 @@ var errEvalFailed = errors.New("evaluation failed: one or more evaluators did no
 
 func newRunCmd() *cobra.Command {
 	var (
-		reportPath  string
-		baseline    bool
-		compareID   string
-		sampleSize  int
-		concurrency int
+		reportPath     string
+		jsonOutputPath string
+		baseline       bool
+		compareID      string
+		sampleSize     int
+		concurrency    int
 	)
 
 	cmd := &cobra.Command{
@@ -54,23 +55,7 @@ func newRunCmd() *cobra.Command {
 			}
 
 			// Build a provider resolver for evaluators (AI judges need providers)
-			resolver := func(provName, model string) (evaluator.ProviderFunc, error) {
-				p, err := provider.NewProvider(provName, "")
-				if err != nil {
-					return nil, err
-				}
-				return func(ctx context.Context, req models.GenerateRequest) (*models.GenerateResponse, error) {
-					if model != "" {
-						if req.Params == nil {
-							req.Params = make(map[string]any)
-						}
-						if _, ok := req.Params["model"]; !ok {
-							req.Params["model"] = model
-						}
-					}
-					return p.Generate(ctx, &req)
-				}, nil
-			}
+			resolver := provider.DefaultResolver()
 
 			// Initialize evaluators
 			evals := make([]evaluator.Evaluator, 0, len(cfg.Evaluators))
@@ -149,6 +134,22 @@ func newRunCmd() *cobra.Command {
 				}
 			}
 
+			// Write JSON output if requested (after comparison so it includes comparison data)
+			if jsonOutputPath != "" {
+				output := struct {
+					Run        *models.Run        `json:"run"`
+					Comparison *models.Comparison  `json:"comparison,omitempty"`
+				}{Run: run, Comparison: comp}
+				data, err := json.MarshalIndent(output, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshaling JSON output: %w", err)
+				}
+				if err := os.WriteFile(jsonOutputPath, data, 0600); err != nil {
+					return fmt.Errorf("writing JSON output: %w", err)
+				}
+				fmt.Fprintf(os.Stdout, "\nJSON output written to: %s\n", jsonOutputPath)
+			}
+
 			// Generate report only if explicitly requested via flag or config
 			if outPath != "" {
 				if err := report.GenerateReport(run, comp, outPath); err != nil {
@@ -169,6 +170,7 @@ func newRunCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&reportPath, "report", "r", "", "Output path for HTML report")
+	cmd.Flags().StringVar(&jsonOutputPath, "json-output", "", "Write full structured results to a JSON file")
 	cmd.Flags().BoolVarP(&baseline, "baseline", "b", false, "Mark this run as baseline")
 	cmd.Flags().StringVar(&compareID, "compare", "", "Run ID to compare against")
 	cmd.Flags().IntVarP(&sampleSize, "sample", "s", 0, "Override dataset sample size")

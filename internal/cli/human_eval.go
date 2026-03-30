@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/character-ai/judgejudy/internal/models"
+	"github.com/character-ai/judgejudy/pkg/models"
 	"github.com/spf13/cobra"
 )
 
