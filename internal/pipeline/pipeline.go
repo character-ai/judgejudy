@@ -206,6 +206,18 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 		}
 	}
 
+	// Post-process: extract JSON if configured
+	if extract, ok := p.cfg.Generator.Params["json_extract"]; ok {
+		if extractStr, ok := extract.(string); ok && extractStr != "" {
+			open, close := extractStr[:1], extractStr[len(extractStr)-1:]
+			if idx := strings.Index(genResp.Content, open); idx >= 0 {
+				if end := strings.LastIndex(genResp.Content, close); end > idx {
+					genResp.Content = genResp.Content[idx : end+len(close)]
+				}
+			}
+		}
+	}
+
 	// Run evaluators
 	scores := make(map[string]models.Score, len(p.evaluators))
 	var scoresMu sync.Mutex

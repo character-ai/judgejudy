@@ -1,0 +1,108 @@
+name: "Tool Use Structured Output Eval"
+description: |
+  Example eval demonstrating tool_use for structured JSON output.
+
+  When AI models ignore JSON format instructions and produce prose/markdown,
+  tool_use forces structured output through a defined schema. The generator
+  extracts the tool call input as the evaluation content.
+
+  This pattern is useful for:
+  - Structured data generation (storyboards, plans, schemas)
+  - Format-critical outputs where JSON compliance matters
+  - Any task where the model tends to produce verbose prose
+
+dataset:
+  inline:
+    id: structured-output-v1
+    name: Structured Output Test
+    version: "1.0.0"
+    modality: text
+    test_cases:
+      - id: recipe-structured
+        input: |
+          Create a recipe for chocolate chip cookies.
+
+          Requirements:
+          - Include exact measurements
+          - Include oven temperature and baking time
+          - List at least 6 ingredients
+        tags: [recipe, structured]
+
+      - id: travel-itinerary
+        input: |
+          Plan a 3-day weekend trip to Portland, Oregon.
+
+          Requirements:
+          - One activity per morning, afternoon, and evening
+          - Include restaurant recommendations
+          - Budget estimate per day
+        tags: [travel, structured]
+
+generator:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  system_prompt: |
+    You are a helpful assistant that produces structured data.
+    When the task is complete, call the submit_result tool with the data.
+    Do NOT output text — ALWAYS use the tool.
+  params:
+    max_tokens: 4096
+    tools: '[{"name":"submit_result","description":"Submit the structured result.","input_schema":{"type":"object","properties":{"title":{"type":"string","description":"Title of the result"},"sections":{"type":"array","items":{"type":"object","properties":{"heading":{"type":"string"},"items":{"type":"array","items":{"type":"string"}}},"required":["heading","items"]}},"metadata":{"type":"object","description":"Any additional structured metadata"}},"required":["title","sections"]}}]'
+    json_extract: "{}"
+
+evaluators:
+  - name: "structure-compliance"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Evaluate whether the output is well-structured JSON with the expected fields.
+
+      Check:
+      - Is the output valid JSON? (If not, score 0)
+      - Does it have a "title" field?
+      - Does it have a "sections" array with heading/items pairs?
+      - Are the items specific and actionable (not vague)?
+
+      Score 10/10 for complete, well-structured output.
+      Score 0/10 for invalid JSON or missing required fields.
+    dimensions:
+      - json_validity
+      - field_completeness
+      - content_quality
+    scale: [0, 10]
+    threshold: 0.7
+
+  - name: "content-quality"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Evaluate the quality and completeness of the structured content.
+
+      Check:
+      - Does the content fully address the input requirements?
+      - Are all specified requirements met? (ingredient count, day count, etc.)
+      - Is the content specific and useful (not generic filler)?
+      - Would a user find this actionable?
+
+      Score 10/10 for thorough, specific, requirement-complete content.
+      Score 1/10 for generic or incomplete content.
+    dimensions:
+      - requirement_coverage
+      - specificity
+      - usefulness
+    scale: [1, 10]
+    threshold: 0.6
+
+pipeline:
+  concurrency: 2
+  timeout_seconds: 120
+  retry_attempts: 2
+  cache_enabled: true
+
+report:
+  output_path: "./tool_use_eval_report.html"
+  title: "Tool Use Structured Output Evaluation"

@@ -13,3 +13,6 @@ report_media/
 human_eval_*.json
 /judgejudy
 build/
+# Generated eval artifacts
+*.output.txt
+*.output.json

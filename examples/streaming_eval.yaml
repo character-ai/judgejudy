@@ -1,0 +1,95 @@
+name: "Streaming / High Token Output Eval"
+description: |
+  Example eval demonstrating streaming support for high-token-count generation.
+
+  The Anthropic provider automatically uses streaming for requests with
+  max_tokens > 16384. This is required for Claude Opus with large outputs
+  (the API returns "streaming is required for operations that may take
+  longer than 10 minutes" without it).
+
+  Use this pattern when:
+  - Generating long-form content (scripts, articles, documentation)
+  - Using Claude Opus with high max_tokens
+  - Any task requiring >16K output tokens
+
+dataset:
+  inline:
+    id: long-form-v1
+    name: Long-Form Generation Test
+    version: "1.0.0"
+    modality: text
+    test_cases:
+      - id: short-story
+        input: |
+          Write a 3000-word short story about a lighthouse keeper who
+          discovers that the light they tend each night is the only thing
+          preventing something in the deep ocean from reaching shore.
+
+          Requirements:
+          - First-person narration
+          - Build tension gradually
+          - End on an ambiguous note
+        tags: [fiction, long-form]
+
+generator:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  params:
+    max_tokens: 16385  # Triggers automatic streaming (threshold: >16384)
+    temperature: 0.8
+
+evaluators:
+  - name: "length-compliance"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Evaluate whether the generated output meets the length requirement.
+
+      The output should be approximately 3000 words (±500 words acceptable).
+      Count or estimate the word count.
+
+      Scoring:
+      - 2500-3500 words: 10/10
+      - 2000-2500 or 3500-4000 words: 7/10
+      - 1500-2000 or 4000-5000 words: 4/10
+      - Under 1500 or over 5000: 1/10
+      - Empty or truncated output: 0/10
+    dimensions:
+      - word_count_compliance
+    scale: [0, 10]
+    threshold: 0.6
+
+  - name: "narrative-quality"
+    type: ai_judge
+    provider: anthropic
+    model: claude-sonnet-4-6
+    mode: pointwise
+    rubric: |
+      Evaluate the narrative quality of this short story.
+
+      Score on:
+      - VOICE: Is the first-person narration distinctive and consistent?
+      - TENSION: Does the story build tension gradually as requested?
+      - ENDING: Is the ending ambiguous as requested?
+      - CRAFT: Is the prose well-written? Vivid imagery, varied sentence structure?
+      - COMPLETENESS: Does the story feel complete (not truncated mid-sentence)?
+    dimensions:
+      - voice
+      - tension_building
+      - ending_quality
+      - craft
+      - completeness
+    scale: [1, 10]
+    threshold: 0.6
+
+pipeline:
+  concurrency: 1
+  timeout_seconds: 600
+  retry_attempts: 1
+  cache_enabled: true
+
+report:
+  output_path: "./streaming_eval_report.html"
+  title: "Streaming / High Token Output Evaluation"
