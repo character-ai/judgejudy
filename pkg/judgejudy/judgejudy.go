@@ -71,6 +71,10 @@ func Run(ctx context.Context, cfg *config.EvalConfig, opts Options) (*RunResult,
 		return nil, fmt.Errorf("config is required")
 	}
 
+	// Shallow-copy the config so we don't mutate the caller's value.
+	cfgCopy := *cfg
+	cfg = &cfgCopy
+
 	// Apply overrides
 	if opts.SampleSize > 0 {
 		cfg.Dataset.Sample = opts.SampleSize
@@ -102,23 +106,7 @@ func Run(ctx context.Context, cfg *config.EvalConfig, opts Options) (*RunResult,
 	}
 
 	// Build provider resolver for AI judge evaluators
-	resolver := func(provName, model string) (evaluator.ProviderFunc, error) {
-		p, err := provider.NewProvider(provName, "")
-		if err != nil {
-			return nil, err
-		}
-		return func(ctx context.Context, req models.GenerateRequest) (*models.GenerateResponse, error) {
-			if model != "" {
-				if req.Params == nil {
-					req.Params = make(map[string]any)
-				}
-				if _, ok := req.Params["model"]; !ok {
-					req.Params["model"] = model
-				}
-			}
-			return p.Generate(ctx, &req)
-		}, nil
-	}
+	resolver := provider.DefaultResolver()
 
 	// Initialize evaluators
 	evals := make([]evaluator.Evaluator, 0, len(cfg.Evaluators))

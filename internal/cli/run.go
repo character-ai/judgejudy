@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -56,23 +55,7 @@ func newRunCmd() *cobra.Command {
 			}
 
 			// Build a provider resolver for evaluators (AI judges need providers)
-			resolver := func(provName, model string) (evaluator.ProviderFunc, error) {
-				p, err := provider.NewProvider(provName, "")
-				if err != nil {
-					return nil, err
-				}
-				return func(ctx context.Context, req models.GenerateRequest) (*models.GenerateResponse, error) {
-					if model != "" {
-						if req.Params == nil {
-							req.Params = make(map[string]any)
-						}
-						if _, ok := req.Params["model"]; !ok {
-							req.Params["model"] = model
-						}
-					}
-					return p.Generate(ctx, &req)
-				}, nil
-			}
+			resolver := provider.DefaultResolver()
 
 			// Initialize evaluators
 			evals := make([]evaluator.Evaluator, 0, len(cfg.Evaluators))
@@ -161,7 +144,7 @@ func newRunCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("marshaling JSON output: %w", err)
 				}
-				if err := os.WriteFile(jsonOutputPath, data, 0644); err != nil {
+				if err := os.WriteFile(jsonOutputPath, data, 0600); err != nil {
 					return fmt.Errorf("writing JSON output: %w", err)
 				}
 				fmt.Fprintf(os.Stdout, "\nJSON output written to: %s\n", jsonOutputPath)
