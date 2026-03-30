@@ -49,6 +49,63 @@ judgejudy run examples/audio_eval.yaml --report report.html
 
 # Video generation with realism + audio checks
 judgejudy run examples/video_eval.yaml --report report.html
+
+# Export structured results as JSON (for programmatic consumers)
+judgejudy run examples/text_eval.yaml --json-output results.json
+```
+
+### Go Library
+
+JudgeJudy can be used as a Go library for programmatic integration:
+
+```go
+import (
+    "github.com/character-ai/judgejudy/pkg/judgejudy"
+    "github.com/character-ai/judgejudy/pkg/config"
+)
+
+// Load config and run evaluation
+cfg, _ := config.LoadConfig("eval.yaml")
+result, _ := judgejudy.Run(ctx, cfg, judgejudy.Options{
+    Store: myCustomStore,  // optional — defaults to SQLite
+})
+
+// Access results
+fmt.Println(result.Run.Aggregate.TotalPassRate)
+for _, tr := range result.Run.Results {
+    fmt.Println(tr.TestCaseID, tr.Scores)
+}
+
+// Generate HTML report
+judgejudy.GenerateReport(result, "report.html")
+```
+
+The `pkg/` packages provide the full public API:
+
+| Package | Description |
+|---------|-------------|
+| `pkg/judgejudy` | Top-level entry point — `Run()` and `GenerateReport()` |
+| `pkg/config` | Config loading and validation |
+| `pkg/models` | All domain types (Run, TestCase, Score, etc.) |
+| `pkg/store` | Store interface for custom persistence backends |
+| `pkg/pipeline` | Pipeline construction and execution |
+| `pkg/evaluator` | Evaluator interface and built-in evaluators |
+| `pkg/provider` | Provider interface and built-in providers |
+
+**Custom Store**: Implement `store.Store` to use your own backend (Spanner, Postgres, DynamoDB, etc.):
+
+```go
+type Store interface {
+    SaveRun(ctx context.Context, run *models.Run) error
+    GetRun(ctx context.Context, id string) (*models.Run, error)
+    ListRuns(ctx context.Context, opts ListOpts) ([]models.Run, error)
+    GetBaseline(ctx context.Context, datasetID string) (*models.Run, error)
+    SetBaseline(ctx context.Context, runID string) error
+    SaveComparison(ctx context.Context, comp *models.Comparison) error
+    SaveHumanEvaluations(ctx context.Context, evals []models.HumanEvaluation) error
+    GetHumanEvaluations(ctx context.Context, runID string) ([]models.HumanEvaluation, error)
+    Close() error
+}
 ```
 
 ### 3. Score with Human Evaluation

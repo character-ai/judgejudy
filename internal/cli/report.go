@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/character-ai/judgejudy/internal/models"
-	"github.com/character-ai/judgejudy/internal/report"
+	"github.com/character-ai/judgejudy/pkg/models"
+	"github.com/character-ai/judgejudy/pkg/report"
 	"github.com/spf13/cobra"
 )
 
