@@ -18,6 +18,7 @@ var knownProviders = map[string]bool{
 	"cartesia":   true,
 	"falai":      true,
 	"wavespeed":    true,
+	"vllm":        true,
 	"passthrough": true,
 }
 
