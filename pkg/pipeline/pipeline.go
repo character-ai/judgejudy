@@ -21,6 +21,8 @@ import (
 	"github.com/character-ai/judgejudy/pkg/models"
 	"github.com/character-ai/judgejudy/pkg/provider"
 	"github.com/character-ai/judgejudy/pkg/store"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -33,12 +35,17 @@ type Pipeline struct {
 	cache      *store.Cache
 	logger     *slog.Logger
 	mediaDir   string // directory to write media files to (if set, frees base64 from memory)
+	metrics    *pipelineMetrics
 }
 
 // New creates a new Pipeline.
 func New(cfg *config.EvalConfig, prov provider.Provider, evals []evaluator.Evaluator, st store.Store, cache *store.Cache, logger *slog.Logger) *Pipeline {
 	if logger == nil {
 		logger = slog.Default()
+	}
+	metrics, err := newPipelineMetrics(otel.GetMeterProvider())
+	if err != nil {
+		logger.Warn("failed to create pipeline metrics, metrics disabled", "error", err)
 	}
 	return &Pipeline{
 		cfg:        cfg,
@@ -47,7 +54,21 @@ func New(cfg *config.EvalConfig, prov provider.Provider, evals []evaluator.Evalu
 		store:      st,
 		cache:      cache,
 		logger:     logger,
+		metrics:    metrics,
 	}
+}
+
+// SetMeterProvider replaces the OpenTelemetry meter provider used for
+// pipeline metrics. By default the global otel.GetMeterProvider() is used,
+// which is a no-op unless the application installs an SDK meter provider.
+func (p *Pipeline) SetMeterProvider(mp metric.MeterProvider) {
+	metrics, err := newPipelineMetrics(mp)
+	if err != nil {
+		p.logger.Warn("failed to create pipeline metrics, metrics disabled", "error", err)
+		p.metrics = nil
+		return
+	}
+	p.metrics = metrics
 }
 
 // SetMediaDir configures the pipeline to write media files to disk as they are
@@ -97,7 +118,14 @@ func (p *Pipeline) Run(ctx context.Context) (*models.Run, error) {
 				return gctx.Err()
 			}
 
+			p.metrics.testCaseStarted(gctx)
+			caseStart := time.Now()
 			result, err := p.processTestCase(gctx, tc, ds.Modality)
+			caseStatus := statusSuccess
+			if err != nil {
+				caseStatus = statusError
+			}
+			p.metrics.testCaseFinished(gctx, time.Since(caseStart).Seconds(), ds.Modality, caseStatus)
 			if err != nil {
 				if p.cfg.Pipeline.FailFast {
 					return fmt.Errorf("test case %s: %w", tc.ID, err)
@@ -127,6 +155,7 @@ func (p *Pipeline) Run(ctx context.Context) (*models.Run, error) {
 	}
 
 	if err := g.Wait(); err != nil {
+		p.metrics.recordRun(ctx, time.Since(start).Seconds(), statusError)
 		return nil, err
 	}
 
@@ -135,9 +164,11 @@ func (p *Pipeline) Run(ctx context.Context) (*models.Run, error) {
 	run.Aggregate = computeAggregate(run.Results, p.evaluators)
 
 	if err := p.store.SaveRun(ctx, run); err != nil {
+		p.metrics.recordRun(ctx, time.Since(start).Seconds(), statusError)
 		return nil, fmt.Errorf("saving run: %w", err)
 	}
 
+	p.metrics.recordRun(ctx, run.DurationSeconds, statusSuccess)
 	return run, nil
 }
 
@@ -171,21 +202,28 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 			p.logger.Debug("cache hit", "test_case", tc.ID)
 			genResp = cached
 		}
+		p.metrics.recordCacheLookup(ctx, genResp != nil)
 	}
 
 	// Generate if not cached
 	if genResp == nil {
+		provName := p.provider.Name()
+		model := p.cfg.Generator.Model
 		var err error
 		for attempt := 0; attempt <= p.cfg.Pipeline.RetryAttempts; attempt++ {
+			genStart := time.Now()
 			genResp, err = p.provider.Generate(ctx, &req)
 			if err == nil {
+				p.metrics.recordGenerationSuccess(ctx, time.Since(genStart).Seconds(), genResp, provName, modality)
 				break
 			}
 			var pe *models.ProviderError
-		if errors.As(err, &pe) && !pe.Retryable {
+			if errors.As(err, &pe) && !pe.Retryable {
+				p.metrics.recordGenerationFailure(ctx, provName, model)
 				return nil, err
 			}
 			if attempt < p.cfg.Pipeline.RetryAttempts {
+				p.metrics.recordGenerationRetry(ctx, provName, model)
 				p.logger.Warn("retrying generation", "test_case", tc.ID, "attempt", attempt+1, "error", err)
 				select {
 				case <-time.After(time.Duration(attempt+1) * time.Second):
@@ -195,6 +233,7 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 			}
 		}
 		if err != nil {
+			p.metrics.recordGenerationFailure(ctx, provName, model)
 			return nil, fmt.Errorf("generation failed after retries: %w", err)
 		}
 
@@ -229,11 +268,14 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 			var score *models.Score
 			var lastErr error
 			for attempt := 0; attempt <= p.cfg.Pipeline.RetryAttempts; attempt++ {
+				evalStart := time.Now()
 				score, lastErr = ev.Evaluate(ectx, tc, *genResp)
 				if lastErr == nil {
+					p.metrics.recordEvaluationSuccess(ectx, ev.Name(), time.Since(evalStart).Seconds())
 					break
 				}
 				if attempt < p.cfg.Pipeline.RetryAttempts {
+					p.metrics.recordEvaluationRetry(ectx, ev.Name())
 					p.logger.Warn("retrying evaluator", "evaluator", ev.Name(), "test_case", tc.ID, "attempt", attempt+1, "error", lastErr)
 					select {
 					case <-time.After(time.Duration(attempt+1) * time.Second):
@@ -243,6 +285,7 @@ func (p *Pipeline) processTestCase(ctx context.Context, tc models.TestCase, moda
 				}
 			}
 			if lastErr != nil {
+				p.metrics.recordEvaluationFailure(ectx, ev.Name())
 				p.logger.Error("evaluator failed", "evaluator", ev.Name(), "test_case", tc.ID, "error", lastErr)
 				return nil // Don't fail the whole test case for one evaluator
 			}
