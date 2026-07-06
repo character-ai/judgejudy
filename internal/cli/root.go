@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"context"
 	"log/slog"
 	"os"
 
+	"github.com/character-ai/judgejudy/internal/telemetry"
 	"github.com/character-ai/judgejudy/pkg/store"
 	"github.com/spf13/cobra"
 )
@@ -13,9 +15,10 @@ var (
 	redisAddr string
 	verbose   bool
 
-	sqliteStore store.Store
-	redisCache  *store.Cache
-	logger      *slog.Logger
+	sqliteStore  store.Store
+	redisCache   *store.Cache
+	logger       *slog.Logger
+	otelShutdown func(context.Context) error
 )
 
 // NewRootCmd creates the root cobra command.
@@ -31,6 +34,14 @@ func NewRootCmd() *cobra.Command {
 				level = slog.LevelDebug
 			}
 			logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+
+			// Initialize OTEL metrics export (no-op unless OTEL_EXPORTER_OTLP_ENDPOINT
+			// or OTEL_EXPORTER_OTLP_METRICS_ENDPOINT is set)
+			var otelErr error
+			otelShutdown, otelErr = telemetry.Setup(cmd.Context(), cmd.Root().Version)
+			if otelErr != nil {
+				logger.Warn("failed to set up OTEL metrics export", "error", otelErr)
+			}
 
 			// Initialize store
 			var err error
@@ -51,6 +62,11 @@ func NewRootCmd() *cobra.Command {
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			if otelShutdown != nil {
+				if err := otelShutdown(cmd.Context()); err != nil {
+					logger.Warn("failed to flush OTEL metrics", "error", err)
+				}
+			}
 			if redisCache != nil {
 				redisCache.Close()
 			}

@@ -376,6 +376,39 @@ Global flags:
   -v, --verbose                     Debug logging
 ```
 
+## Observability
+
+The pipeline is instrumented with [OpenTelemetry](https://opentelemetry.io/) metrics. The CLI exports them over OTLP/gRPC when the standard OTEL environment variables are set; with no endpoint configured, instrumentation is a no-op.
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 judgejudy run eval.yaml
+```
+
+| Metric | Type | Description |
+|---|---|---|
+| `judgejudy.runs` | counter | Completed evaluation runs, by `status` |
+| `judgejudy.run.duration` | histogram (s) | End-to-end run duration |
+| `judgejudy.test_cases` | counter | Processed test cases, by `modality` and `status` |
+| `judgejudy.test_case.duration` | histogram (s) | Per-test-case duration (generation + evaluation) |
+| `judgejudy.test_cases.in_flight` | up/down counter | Test cases currently being processed |
+| `judgejudy.generation.requests` | counter | Generation requests, by `provider`, `model`, `status` |
+| `judgejudy.generation.duration` | histogram (s) | Successful generation call latency |
+| `judgejudy.generation.retries` | counter | Generation attempts retried after failure |
+| `judgejudy.generation.tokens` | counter | Tokens used by generation calls |
+| `judgejudy.generation.cost` | counter (USD) | Generation cost |
+| `judgejudy.cache.requests` | counter | Cache lookups, by `result` (hit/miss) |
+| `judgejudy.evaluations` | counter | Evaluator executions, by `evaluator` and `status` |
+| `judgejudy.evaluation.duration` | histogram (s) | Successful evaluator call latency |
+| `judgejudy.evaluation.retries` | counter | Evaluator attempts retried after failure |
+
+Library consumers can pass their own meter provider instead:
+
+```go
+result, err := judgejudy.Run(ctx, cfg, judgejudy.Options{
+    MeterProvider: myMeterProvider, // any metric.MeterProvider; defaults to the OTEL global
+})
+```
+
 ## Architecture
 
 ```

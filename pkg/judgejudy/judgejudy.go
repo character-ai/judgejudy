@@ -24,6 +24,7 @@ import (
 	"github.com/character-ai/judgejudy/pkg/provider"
 	"github.com/character-ai/judgejudy/pkg/report"
 	"github.com/character-ai/judgejudy/pkg/store"
+	"go.opentelemetry.io/otel/metric"
 )
 
 // Options configures a library-driven evaluation run.
@@ -35,6 +36,13 @@ type Options struct {
 	// Logger is the structured logger for pipeline events.
 	// If nil, slog.Default() is used.
 	Logger *slog.Logger
+
+	// MeterProvider is the OpenTelemetry meter provider used to record
+	// pipeline metrics (run/test-case durations, generation latency, tokens,
+	// cost, cache hits, retries). If nil, the global otel.GetMeterProvider()
+	// is used, which is a no-op unless the application installs an SDK
+	// meter provider.
+	MeterProvider metric.MeterProvider
 
 	// Concurrency overrides the pipeline concurrency from the config.
 	// Zero means use the config value.
@@ -120,6 +128,10 @@ func Run(ctx context.Context, cfg *config.EvalConfig, opts Options) (*RunResult,
 
 	// Create and run pipeline
 	p := pipeline.New(cfg, prov, evals, st, nil, logger)
+
+	if opts.MeterProvider != nil {
+		p.SetMeterProvider(opts.MeterProvider)
+	}
 
 	if opts.MediaDir != "" {
 		p.SetMediaDir(opts.MediaDir)
