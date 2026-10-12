@@ -50,8 +50,9 @@ var modelCosts = map[string]ModelCost{
 	"eleven_v3":             {PerAudioSec: 0.0018},
 
 	// Cartesia audio models
-	"sonic-2": {PerAudioSec: 0.001},
-	"sonic-3": {PerAudioSec: 0.001},
+	"sonic-2":   {PerAudioSec: 0.001},
+	"sonic-3":   {PerAudioSec: 0.001},
+	"sonic-3.6": {PerAudioSec: 0.001},
 
 	// WaveSpeed video models (per-second pricing)
 	"seedance-v1":     {PerVideoSec: 0.07},

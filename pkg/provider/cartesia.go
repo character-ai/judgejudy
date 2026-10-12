@@ -34,7 +34,7 @@ func (p *CartesiaProvider) Generate(ctx context.Context, req *models.GenerateReq
 		return nil, &models.ProviderError{Provider: "cartesia", Message: fmt.Sprintf("unsupported modality: %s", req.Modality)}
 	}
 
-	model := getParam(req.Params, "model", "sonic-2")
+	model := getParam(req.Params, "model", "sonic-3.6")
 	voiceID := getParam(req.Params, "voice_id", "a0e99841-438c-4a64-b679-ae501e7d6091")
 
 	payload := map[string]any{

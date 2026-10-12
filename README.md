@@ -181,7 +181,7 @@ No API keys are needed for the passthrough provider. See `examples/pregenerated_
 | Anthropic | Claude Opus/Sonnet/Haiku (streaming, tool_use) | - | - | - |
 | Google Gemini | Gemini 2.5 Pro/Flash | - | - | - |
 | ElevenLabs | - | - | Eleven v3, Multilingual v2 | - |
-| Cartesia | - | - | Sonic 2, Sonic 3 | - |
+| Cartesia | - | - | Sonic 3, Sonic 3.6 | - |
 | WaveSpeed | - | Seedream | - | Seedance, WAN, VEO3, Sora-2 |
 | fal.ai | - | - | - | Kling3 |
 | Replicate | - | Various | Various | Various |
